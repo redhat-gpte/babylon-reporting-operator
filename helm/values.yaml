@@ -27,11 +27,11 @@ serviceAccount:
 
 resources:
   limits:
-    cpu: "1"
-    memory: 256Mi
+    cpu: "4"
+    memory: 1024Mi
   requests:
     cpu: 100m
-    memory: 256Mi
+    memory: 1024Mi
 
 nodeSelector: {}
 
