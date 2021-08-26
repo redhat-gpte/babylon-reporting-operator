@@ -455,6 +455,9 @@ def prepare(anarchy_subject, logger):
     if workshop_users == 0:
         workshop_users = 1
 
+    if resource_claim_requester is None:
+        resource_claim_requester = provision_job_vars.get('student_name')
+
     # Define a dictionary with all information from provisions
     provision = {
         'provisioned_at': provision_job_start_timestamp,
