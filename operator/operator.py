@@ -52,6 +52,7 @@ def handle_event_provisioning(logger, anarchy_subject):
     provision = prepare(anarchy_subject, logger)
 
     if provision:
+        logger.info(f"Parsing Provisions Values for provision UUID {resource_uuid}: {provision}")
         user_name = provision.get('username')
         provision['user'] = search_ipa_user(user_name, logger)
         provision['user_db'] = populate_user(provision, logger)
@@ -358,6 +359,7 @@ def populate_user(provision, logger):
 
 
 def search_ipa_user(user_name, logger):
+    logger.info(f"Searching IPA username '{user_name}'")
     ipa_user = GPTEIpaLdap(logger)
     results = ipa_user.search_ipa_user(user_name)
     return results
