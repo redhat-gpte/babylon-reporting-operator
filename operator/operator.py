@@ -54,12 +54,12 @@ def handle_event_provisioning(logger, anarchy_subject):
     if provision:
         user_name = provision.get('username')
         provision['user'] = search_ipa_user(user_name, logger)
+        logger.info(f"Parsing Provisions Values for provision UUID {resource_uuid}: {provision}")
         provision['user_db'] = populate_user(provision, logger)
         provision['catalog_id'] = populate_catalog(provision, logger)
 
         prov = Provisions(logger, provision)
         prov.populate_provisions()
-        logger.info(f"Parsing Provisions Values for provision UUID {resource_uuid}: {provision}")
 
     utils.provision_lifecycle(resource_uuid, current_state, username)
 
@@ -354,6 +354,12 @@ def populate_catalog(provision, logger):
 
 def populate_user(provision, logger):
     users = Users(logger, provision)
+    # results = {'user_id': 'default',
+    #            'manager_chargeback_id': 'default',
+    #            'manager_id': 'default',
+    #            'cost_center': '441'
+    #  }
+
     results = users.populate_users()
     return results
 

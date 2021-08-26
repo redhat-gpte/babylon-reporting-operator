@@ -204,6 +204,7 @@ class Users(GPTELdap):
             }
         """
         # TODO: How to get User's geo from IPA
+        self.logger(f"USER INFO on 'populate_users': {self.user_data}")
         user_first_name = self.user_data.get('givenName').capitalize().strip()
         user_last_name = self.user_data.get('sn').capitalize().strip()
         user_full_name = f"{user_first_name} {user_last_name}"
