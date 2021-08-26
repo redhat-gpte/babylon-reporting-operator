@@ -258,7 +258,7 @@ def parse_dict_null_value(dictionary):
 def get_secret_data(secret_name, secret_namespace=None):
     core_v1_api = kubernetes.client.CoreV1Api()
     if not secret_namespace:
-        secret_namespace = "babylon-reporting-dev"
+        secret_namespace = "babylon-reporting"
     secret = core_v1_api.read_namespaced_secret(
         secret_name, secret_namespace
     )
