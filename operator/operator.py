@@ -472,7 +472,7 @@ def prepare(anarchy_subject, logger):
         'cloud_region': provision_job_vars.get('region', anarchy_subject_job_vars.get('region')),
         'cloud': provision_job_vars.get('cloud_provider', 'test'),
         'env_type': provision_job_vars.get('env_type', 'tests'),
-        'datasource': provision_job_vars.get('platform', 'tests'),
+        'datasource': provision_job_vars.get('platform', 'tests').upper(),
         'environment': class_list[2],
         'account': class_list[0],
         'class_name': class_name,

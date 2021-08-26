@@ -12,7 +12,7 @@ class Users(GPTELdap):
         self.prov_data = prov_data
         self.user_data = self.prov_data.get('user', {})
         self.manager_data = self.user_data.get('manager', {})
-        self.user_mail = self.user_data['mail'].lower()
+        self.user_mail = self.user_data.get('mail', '').lower()
         self.manager_mail = 'default'
 
     def check_user_exists(self):
