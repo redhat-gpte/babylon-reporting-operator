@@ -52,7 +52,6 @@ def handle_event_provisioning(logger, anarchy_subject):
     provision = prepare(anarchy_subject, logger)
 
     if provision:
-        logger.info(f"Parsing Provisions Values for provision UUID {resource_uuid}: {provision}")
         user_name = provision.get('username')
         provision['user'] = search_ipa_user(user_name, logger)
         provision['user_db'] = populate_user(provision, logger)
@@ -60,6 +59,7 @@ def handle_event_provisioning(logger, anarchy_subject):
 
         prov = Provisions(logger, provision)
         prov.populate_provisions()
+        logger.info(f"Parsing Provisions Values for provision UUID {resource_uuid}: {provision}")
 
     utils.provision_lifecycle(resource_uuid, current_state, username)
 
