@@ -88,10 +88,6 @@ class Provisions(object):
 
         # TODO: Fix cloud ec2 to AWS and osp to openstack
         cloud = self.prov_data.get('cloud', 'unknown')
-        if cloud == 'ec2':
-            cloud = 'aws'
-        elif cloud == 'osp':
-            cloud = 'openstack'
 
         provisioned_at = datetime.utcnow()
         query = f"INSERT INTO provisions (\n" \
