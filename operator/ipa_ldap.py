@@ -86,7 +86,7 @@ class GPTEIpaLdap(object):
         if 'cn' in user_data:
             region_name = user_data['cn'].split('-')[2].upper()
         else:
-            region_name = 'unknown'
+            region_name = 'NA'
 
         return region_name
 
