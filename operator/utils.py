@@ -328,6 +328,9 @@ def provision_lifecycle(provision_uuid, current_state, username):
     if last_state == current_state:
         return
 
+    if username is None:
+        username = 'gpte-user'
+
     positional_args = [
         provision_uuid,
         current_state,
@@ -347,11 +350,9 @@ def update_provision_result(provision_uuid, result='success'):
     execute_query(query, autocommit=True, positional_args=positional_args)
 
 
-
-
-def check_provision_exists(provision_uuid):
+def check_provision_exists(provision_uuid, babylon_guid):
     query = f"SELECT uuid from provisions \n" \
-            f"WHERE uuid = '{provision_uuid}'"
+            f"WHERE uuid = '{provision_uuid}' or babylon_guid = '{babylon_guid}'"
     result = execute_query(query)
     if result['rowcount'] >= 1:
         query_result = result['query_result'][0]
@@ -361,15 +362,18 @@ def check_provision_exists(provision_uuid):
 
 
 def timestamp_to_utc(timestamp_received):
-    if timestamp_received is None:
+    if timestamp_received:
+        timestamp_received_dt = timestamp_received
+        if isinstance(timestamp_received, str):
+            try:
+                timestamp_received_dt = datetime.strptime(timestamp_received, '%Y-%m-%dT%H:%M:%SZ')
+            except ValueError:
+                timestamp_received_dt = datetime.strptime(timestamp_received, '%Y-%m-%dT%H:%M:%S+00:00')
+
+        tz_info = pytz.timezone('America/New_York')
+        timestamp_received_dt = tz_info.localize(timestamp_received_dt)
+        timestamp_received_utc = timestamp_received_dt.astimezone(pytz.timezone('UTC'))
+        return timestamp_received_utc.strftime('%Y-%m-%dT%H:%M:%S+00:00')
+    else:
         return timestamp_received
-
-    timestamp_received_dt = timestamp_received
-
-    if isinstance(timestamp_received, str):
-        timestamp_received_dt = datetime.strptime(timestamp_received, '%Y-%m-%dT%H:%M:%SZ').timestamp()
-
-    dt_naive_utc = datetime.utcfromtimestamp(timestamp_received_dt)
-
-    return dt_naive_utc.replace(tzinfo=pytz.utc).strftime('%FT%T+00:00')
 
