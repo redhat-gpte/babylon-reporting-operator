@@ -79,9 +79,9 @@ class Users(GPTELdap):
         if manager_id == -1:
             query = f"INSERT INTO manager (name, email, kerberos_id) \n" \
                     f"VALUES ( \n" \
-                    f"  {self.manager_data['cn']}, \n" \
-                    f"  {self.manager_data['mail']}, \n" \
-                    f"  {self.manager_data['uid']}) RETURNING id;"
+                    f"  '{self.manager_data['cn']}', \n" \
+                    f"  '{self.manager_data['mail']}', \n" \
+                    f"  '{self.manager_data['uid']}') RETURNING id;"
             result = utils.execute_query(query, autocommit=True)
             if result['rowcount'] >= 1:
                 manager_id = result['query_result'][0]
@@ -204,9 +204,8 @@ class Users(GPTELdap):
             }
         """
         # TODO: How to get User's geo from IPA
-        self.logger(f"USER INFO on 'populate_users': {self.user_data}")
-        user_first_name = self.user_data.get('givenName').capitalize().strip()
-        user_last_name = self.user_data.get('sn').capitalize().strip()
+        user_first_name = self.user_data.get('givenName', 'default').capitalize().strip()
+        user_last_name = self.user_data.get('sn', 'default').capitalize().strip()
         user_full_name = f"{user_first_name} {user_last_name}"
 
         self.user_data['partner'] = 'partner'
