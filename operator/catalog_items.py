@@ -35,10 +35,11 @@ class CatalogItems(object):
                     f"  infra_type) \n" \
                     f"VALUES ( \n" \
                     f"  '{self.prov_data['catalog_item']}', \n" \
-                    f"  '{self.prov_data['catalog_name'].strip()}', \n" \
+                    f"  '{self.prov_data.get('catalog_name', '')}', \n" \
                     f"  '{self.prov_data['class_name']}', \n" \
                     f"  '{c_type}') RETURNING id \n"
-            self.logger.info(f"Inserting Catalog Item: \n{query}")
+            if self.debug:
+                self.logger.info(f"Inserting Catalog Item: \n{query}")
             result = utils.execute_query(query, autocommit=True)
             if result['rowcount'] >= 1:
                 query_result = result['query_result'][0]
