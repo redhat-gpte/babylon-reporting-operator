@@ -32,12 +32,12 @@ namespaces = {}
 
 
 def handle_no_event(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username = get_resource_vars(anarchy_subject)
+    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
     logger.info(f"Ignore action for the state '{current_state}'")
 
 
 def handle_event_provision_pending(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username = get_resource_vars(anarchy_subject)
+    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
 
     logger.info(f"Handle event provision pending for {resource_uuid}.")
 
@@ -45,7 +45,7 @@ def handle_event_provision_pending(logger, anarchy_subject):
 
 
 def handle_event_provisioning(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username = get_resource_vars(anarchy_subject)
+    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
 
     logger.info(f"Handle event provisioning for {resource_uuid}.")
 
@@ -54,7 +54,7 @@ def handle_event_provisioning(logger, anarchy_subject):
     if provision:
         user_name = provision.get('username')
         provision['user'] = search_ipa_user(user_name, logger)
-        logger.info(f"Parsing Provisions Values for provision UUID {resource_uuid}: {provision}")
+        # logger.info(f"Parsing Provisions Values for provision UUID {resource_uuid}: {provision}")
         provision['user_db'] = populate_user(provision, logger)
         provision['catalog_id'] = populate_catalog(provision, logger)
 
@@ -65,14 +65,14 @@ def handle_event_provisioning(logger, anarchy_subject):
 
 
 def handle_event_provision_failed(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username = get_resource_vars(anarchy_subject)
+    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
 
     logger.info(f"Handle event provision failed for {resource_uuid}.")
 
     last_action = utils.last_lifecycle(resource_uuid)
 
     # Update provision_results if the last action was provision
-    if last_action.startswith('provision'):
+    if last_action and last_action.startswith('provision'):
         logger.info("Last action was provision, updating provision_result")
         utils.update_provision_result(resource_uuid, 'failure')
 
@@ -80,7 +80,7 @@ def handle_event_provision_failed(logger, anarchy_subject):
 
 
 def handle_event_provision_complete(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username = get_resource_vars(anarchy_subject)
+    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
 
     logger.info(f"Handle event provision complete for {resource_uuid}.")
 
@@ -88,11 +88,11 @@ def handle_event_provision_complete(logger, anarchy_subject):
 
 
 def handle_event_started(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username = get_resource_vars(anarchy_subject)
+    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
 
     logger.info(f"Handle event started for {resource_uuid}.")
 
-    provision_exists = utils.check_provision_exists(resource_uuid)
+    provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
 
     if provision_exists == -1:
         handle_event_provisioning(logger, anarchy_subject)
@@ -105,11 +105,11 @@ def handle_event_started(logger, anarchy_subject):
 
 
 def handle_event_start_pending(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username = get_resource_vars(anarchy_subject)
+    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
 
     logger.info(f"Handle event start pending for {resource_uuid}.")
 
-    provision_exists = utils.check_provision_exists(resource_uuid)
+    provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
 
     if provision_exists == -1:
         handle_event_provisioning(logger, anarchy_subject)
@@ -118,11 +118,11 @@ def handle_event_start_pending(logger, anarchy_subject):
 
 
 def handle_event_starting(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username = get_resource_vars(anarchy_subject)
+    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
 
     logger.info(f"Handle event starting for {resource_uuid}.")
 
-    provision_exists = utils.check_provision_exists(resource_uuid)
+    provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
     if provision_exists == -1:
         handle_event_provisioning(logger, anarchy_subject)
 
@@ -130,11 +130,11 @@ def handle_event_starting(logger, anarchy_subject):
 
 
 def handle_event_start_failed(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username = get_resource_vars(anarchy_subject)
+    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
 
     logger.info(f"Handle event start failed for {resource_uuid}.")
 
-    provision_exists = utils.check_provision_exists(resource_uuid)
+    provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
 
     if provision_exists == -1:
         handle_event_provisioning(logger, anarchy_subject)
@@ -154,11 +154,11 @@ def handle_event_start_failed(logger, anarchy_subject):
 
 
 def handle_event_stop_pending(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username = get_resource_vars(anarchy_subject)
+    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
 
     logger.info(f"Handle event stop pending for {resource_uuid}.")
 
-    provision_exists = utils.check_provision_exists(resource_uuid)
+    provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
 
     if provision_exists == -1:
         handle_event_provisioning(logger, anarchy_subject)
@@ -167,11 +167,11 @@ def handle_event_stop_pending(logger, anarchy_subject):
 
 
 def handle_event_stopping(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username = get_resource_vars(anarchy_subject)
+    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
 
     logger.info(f"Handle event stopping for {resource_uuid}.")
 
-    provision_exists = utils.check_provision_exists(resource_uuid)
+    provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
 
     if provision_exists == -1:
         handle_event_provisioning(logger, anarchy_subject)
@@ -180,11 +180,11 @@ def handle_event_stopping(logger, anarchy_subject):
 
 
 def handle_event_stop_failed(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username = get_resource_vars(anarchy_subject)
+    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
 
     logger.info(f"Handle event stop failed for {resource_uuid}.")
 
-    provision_exists = utils.check_provision_exists(resource_uuid)
+    provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
 
     if provision_exists == -1:
         handle_event_provisioning(logger, anarchy_subject)
@@ -193,11 +193,11 @@ def handle_event_stop_failed(logger, anarchy_subject):
 
 
 def handle_event_stopped(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username = get_resource_vars(anarchy_subject)
+    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
 
     logger.info(f"Handle event stopped for {resource_uuid}.")
 
-    provision_exists = utils.check_provision_exists(resource_uuid)
+    provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
 
     if provision_exists == -1:
         handle_event_provisioning(logger, anarchy_subject)
@@ -206,11 +206,11 @@ def handle_event_stopped(logger, anarchy_subject):
 
 
 def handle_event_destroying(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username = get_resource_vars(anarchy_subject)
+    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
 
     logger.info(f"Handle event destroying for {resource_uuid}.")
 
-    provision_exists = utils.check_provision_exists(resource_uuid)
+    provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
 
     if provision_exists == -1:
         handle_event_provisioning(logger, anarchy_subject)
@@ -219,11 +219,24 @@ def handle_event_destroying(logger, anarchy_subject):
 
 
 def handle_event_destroy_failed(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username = get_resource_vars(anarchy_subject)
+    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
 
     logger.info(f"Handle event destroy failed for {resource_uuid}.")
 
-    provision_exists = utils.check_provision_exists(resource_uuid)
+    provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
+
+    if provision_exists == -1:
+        handle_event_provisioning(logger, anarchy_subject)
+
+    utils.provision_lifecycle(resource_uuid, current_state, username)
+
+
+def handle_event_destroy_canceled(logger, anarchy_subject):
+    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
+
+    logger.info(f"Handle event destroy failed for {resource_uuid}.")
+
+    provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
 
     if provision_exists == -1:
         handle_event_provisioning(logger, anarchy_subject)
@@ -246,7 +259,8 @@ resource_states = {
     'stop-failed': handle_event_stop_failed,
     'stopped': handle_event_stopped,
     'destroying': handle_event_destroying,
-    'destroy-failed': handle_event_destroy_failed
+    'destroy-failed': handle_event_destroy_failed,
+    'destroy-canceled': handle_event_destroy_canceled
 }
 
 
@@ -269,7 +283,9 @@ def get_resource_vars(anarchy_subject):
 
     desired_state = anarchy_subject_spec_vars.get('desired_state')
 
-    return current_state, desired_state, resource_uuid, username
+    babylon_guid = anarchy_subject_job_vars.get('guid')
+
+    return current_state, desired_state, resource_uuid, username, babylon_guid
 
 
 @kopf.on.startup()
@@ -323,7 +339,7 @@ def anarchysubject_event(event, logger, **_):
     anarchy_subject_metadata = anarchy_subject['metadata']
     anarchy_subject_annotations = anarchy_subject_metadata['annotations']
 
-    current_state, desired_state, resource_uuid, username = get_resource_vars(anarchy_subject)
+    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
 
     logger.info(f"Current State: {current_state} for provision uuid {resource_uuid}")
     if current_state in resource_states:
@@ -354,13 +370,16 @@ def populate_catalog(provision, logger):
 
 def populate_user(provision, logger):
     users = Users(logger, provision)
-    # results = {'user_id': 'default',
-    #            'manager_chargeback_id': 'default',
-    #            'manager_id': 'default',
-    #            'cost_center': '441'
-    #  }
-
-    results = users.populate_users()
+    user_data = provision.get('user', {})
+    user_email = user_data.get('mail', '').lower()
+    if user_email == '':
+        results = {'user_id': 'default',
+                   'manager_chargeback_id': 'default',
+                   'manager_id': 'default',
+                   'cost_center': '441'
+         }
+    else:
+        results = users.populate_users()
     return results
 
 
@@ -368,6 +387,7 @@ def search_ipa_user(user_name, logger):
     logger.info(f"Searching IPA username '{user_name}'")
     ipa_user = GPTEIpaLdap(logger)
     results = ipa_user.search_ipa_user(user_name)
+    # logger.info(f"'search_ipa_user': {results}")
     return results
 
 
@@ -395,10 +415,6 @@ def prepare(anarchy_subject, logger):
                                                        )
     logger.info(f"Resource claim UUID: {resource_claim_uuid}")
 
-    # This is the resource requester
-    resource_claim_requester = anarchy_subject_annotations.get(
-        f"{poolboy_domain}/resource-requester-preferred-username")
-
     resource_label_governor = anarchy_subject_spec.get('governor')
 
     # TODO: If deployed using CloudForms, we have to return... I need help from Johnathan to remember where is
@@ -406,7 +422,7 @@ def prepare(anarchy_subject, logger):
 
     resource_current_state = anarchy_subject_spec_vars.get('current_state')
     resource_desired_state = anarchy_subject_spec_vars.get('desired_state')
-    logger.info(f"Resource Current State: {resource_current_state} - Resource Desired State: {resource_desired_state}")
+    logger.info(f"Resource UUID: {resource_claim_uuid} - Resource Current State: {resource_current_state} - Resource Desired State: {resource_desired_state}")
 
     # I've to wait until I have all data from Tower and all variables used
     if resource_current_state and 'provision-pending' in resource_current_state:
@@ -415,28 +431,38 @@ def prepare(anarchy_subject, logger):
 
     catalog_display_name = resource_label_governor
     catalog_item_display_name = resource_label_governor
-    if resource_current_state in ('provision', 'provision-completed'):
-        resource_claim = custom_objects_api.get_namespaced_custom_object(
-            poolboy_domain, poolboy_api_version,
-            resource_claim_namespace, 'resourceclaims', as_resource_claim_name
-        )
-        resource_claim_metadata = resource_claim['metadata']
-        resource_claim_annotations = resource_claim_metadata['annotations']
-        resource_claim_labels = resource_claim_metadata['labels']
+    resource_claim_requester = None
+    if as_resource_claim_name and resource_claim_namespace:
+        try:
+            resource_claim = custom_objects_api.get_namespaced_custom_object(
+                poolboy_domain, poolboy_api_version,
+                resource_claim_namespace, 'resourceclaims', as_resource_claim_name
+            )
+            resource_claim_metadata = resource_claim['metadata']
+            resource_claim_annotations = resource_claim_metadata['annotations']
+            resource_claim_labels = resource_claim_metadata['labels']
 
+            # This is the resource requester
+            resource_claim_requester = anarchy_subject_annotations.get(
+                f"{poolboy_domain}/resource-requester-preferred-username",
+                resource_claim_annotations.get(f"{babylon_domain}/requester"))
 
-        # if babylon/catalogDisplayName get it from labels/{babylon_domain}/catalogItemName
-        catalog_display_name = resource_claim_annotations.get(f"{babylon_domain}/catalogDisplayName",
-                                                  resource_claim_labels.get(f"{babylon_domain}/catalogItemName", None))
-        catalog_item_display_name = resource_claim_annotations.get(f"{babylon_domain}/catalogItemDisplayName",
-                                                       resource_claim_labels.get(f"{babylon_domain}/catalogItemName", None))
-        logger.info(
-            f"catalog_display_name: {catalog_display_name} - catalog_item_display_name: {catalog_item_display_name}")
+            # if babylon/catalogDisplayName get it from labels/{babylon_domain}/catalogItemName
+            catalog_display_name = resource_claim_annotations.get(f"{babylon_domain}/catalogDisplayName",
+                                                      resource_claim_labels.get(f"{babylon_domain}/catalogItemName",
+                                                                                resource_label_governor))
+            catalog_item_display_name = resource_claim_annotations.get(f"{babylon_domain}/catalogItemDisplayName",
+                                                           resource_claim_labels.get(f"{babylon_domain}/catalogItemName",
+                                                                                     resource_label_governor))
+            logger.info(
+                f"catalog_display_name: {catalog_display_name} - catalog_item_display_name: {catalog_item_display_name}")
+        except Exception as e:
+            logger.warning(f"Error getting resource claim {as_resource_claim_name} from namespace "
+                           f"{resource_claim_namespace} for provision UUID {resource_claim_uuid}")
+            pass
 
     provision_job_start_timestamp = utils.timestamp_to_utc(provision_job.get('startTimestamp'))
     provision_job_complete_timestamp = utils.timestamp_to_utc(provision_job.get('completeTimestamp'))
-    logger.info(f"provision_job_start_timestamp: {provision_job_start_timestamp} - "
-                f"provision_job_complete_timestamp: {provision_job_complete_timestamp}")
     provision_time = None
 
     provision_job_vars = {}
@@ -461,8 +487,17 @@ def prepare(anarchy_subject, logger):
     if workshop_users == 0:
         workshop_users = 1
 
-    if resource_claim_requester is None:
-        resource_claim_requester = provision_job_vars.get('student_name')
+    datasource = provision_job_vars.get('platform', 'tests').upper()
+    if datasource == 'LABS':
+        datasource = 'OPENTLC'
+
+    cloud = provision_job_vars.get('cloud_provider', 'test')
+    if cloud == 'ec2':
+        cloud = 'aws'
+    elif cloud == 'osp':
+        cloud = 'openstack'
+    elif cloud == 'none':
+        cloud = 'shared'
 
     # Define a dictionary with all information from provisions
     provision = {
@@ -479,9 +514,9 @@ def prepare(anarchy_subject, logger):
         'desired_state': resource_desired_state,
         'babylon_guid': provision_job_vars.get('guid', anarchy_subject_job_vars.get('guid')),
         'cloud_region': provision_job_vars.get('region', anarchy_subject_job_vars.get('region')),
-        'cloud': provision_job_vars.get('cloud_provider', 'test'),
+        'cloud': cloud,
         'env_type': provision_job_vars.get('env_type', 'tests'),
-        'datasource': provision_job_vars.get('platform', 'tests').upper(),
+        'datasource': datasource,
         'environment': class_list[2],
         'account': class_list[0],
         'class_name': class_name,
