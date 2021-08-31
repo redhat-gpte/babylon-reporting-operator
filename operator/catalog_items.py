@@ -9,8 +9,9 @@ class CatalogItems(object):
         self.prov_data = prov_data
 
     def check_catalog_exists(self):
-        query = f"SELECT id FROM catalog_items " \
-                f"WHERE catalog_item = '{self.prov_data['catalog_item']}'"
+        query = f"SELECT id FROM catalog_items \n" \
+                f"WHERE catalog_item = '{self.prov_data['catalog_item']}' \n" \
+                f"LIMIT 1;"
         result = utils.execute_query(query)
         if result['rowcount'] >= 1:
             query_result = result['query_result'][0]
@@ -25,8 +26,8 @@ class CatalogItems(object):
         elif 'sandbox' in self.prov_data['account']:
             c_type = 'Sandbox'
 
-        # If catalog Item doesn't exists, we have to insert
         catalog_id = self.check_catalog_exists()
+
         if catalog_id == -1:
             query = f"INSERT INTO catalog_items ( \n" \
                     f"  catalog_item, \n" \
@@ -40,6 +41,7 @@ class CatalogItems(object):
                     f"  '{c_type}') RETURNING id \n"
             if self.debug:
                 self.logger.info(f"Inserting Catalog Item: \n{query}")
+
             result = utils.execute_query(query, autocommit=True)
             if result['rowcount'] >= 1:
                 query_result = result['query_result'][0]
@@ -48,5 +50,4 @@ class CatalogItems(object):
                 self.logger.error(f"Error inserting catalog {self.prov_data['catalog_item']}")
                 return -1
         else:
-            # TODO: Needs to be updated or just return the catalog_id???
             return catalog_id
