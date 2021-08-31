@@ -391,6 +391,12 @@ def search_ipa_user(user_name, logger):
     return results
 
 
+def parse_catalog_item(catalog_display_name, catalog_item_display_name):
+    name_list = catalog_display_name.split('.')
+    ci_name = name_list[1]
+    return  ci_name.strip()
+
+
 def prepare(anarchy_subject, logger):
     anarchy_subject_spec = anarchy_subject['spec']
     anarchy_subject_spec_vars = anarchy_subject_spec['vars']
@@ -416,9 +422,7 @@ def prepare(anarchy_subject, logger):
     logger.info(f"Resource claim UUID: {resource_claim_uuid}")
 
     resource_label_governor = anarchy_subject_spec.get('governor')
-
-    # TODO: If deployed using CloudForms, we have to return... I need help from Johnathan to remember where is
-    #  the annotation
+    logger.info(f"resource_label_governor: {resource_label_governor}")
 
     resource_current_state = anarchy_subject_spec_vars.get('current_state')
     resource_desired_state = anarchy_subject_spec_vars.get('desired_state')
@@ -429,9 +433,10 @@ def prepare(anarchy_subject, logger):
         logger.info(f"Waiting for provisioning state for {resource_claim_uuid}")
         return
 
-    catalog_display_name = resource_label_governor
-    catalog_item_display_name = resource_label_governor
+    catalog_display_name = parse_catalog_item(resource_label_governor, resource_label_governor)
+    catalog_item_display_name = parse_catalog_item(resource_label_governor, resource_label_governor)
     resource_claim_requester = None
+    resource_guid = None
     if as_resource_claim_name and resource_claim_namespace:
         try:
             resource_claim = custom_objects_api.get_namespaced_custom_object(
@@ -442,22 +447,33 @@ def prepare(anarchy_subject, logger):
             resource_claim_annotations = resource_claim_metadata['annotations']
             resource_claim_labels = resource_claim_metadata['labels']
 
+            # Used by CloudForms
+            notifier = resource_claim_annotations.get(f'{babylon_domain}/notifier', None)
+            if notifier and notifier == 'disable':
+                resource_name = resource_claim_metadata.get('name', 'default')
+                resource_guid = resource_name[-4:]
+
             # This is the resource requester
             resource_claim_requester = anarchy_subject_annotations.get(
                 f"{poolboy_domain}/resource-requester-preferred-username",
                 resource_claim_annotations.get(f"{babylon_domain}/requester"))
 
             # if babylon/catalogDisplayName get it from labels/{babylon_domain}/catalogItemName
+            # else, try to get it from resource_claim lables or finally using resource_label_governor
             catalog_display_name = resource_claim_annotations.get(f"{babylon_domain}/catalogDisplayName",
                                                       resource_claim_labels.get(f"{babylon_domain}/catalogItemName",
                                                                                 resource_label_governor))
             catalog_item_display_name = resource_claim_annotations.get(f"{babylon_domain}/catalogItemDisplayName",
                                                            resource_claim_labels.get(f"{babylon_domain}/catalogItemName",
                                                                                      resource_label_governor))
-            logger.info(
-                f"catalog_display_name: {catalog_display_name} - catalog_item_display_name: {catalog_item_display_name}")
+
+            logger.info(f"catalog_display_name: {catalog_display_name} "
+                        f"catalog_item_display_name: {catalog_item_display_name}")
+            catalog_display_name = parse_catalog_item(catalog_display_name, catalog_item_display_name)
+            catalog_item_display_name = catalog_display_name
+
         except Exception as e:
-            logger.warning(f"Error getting resource claim {as_resource_claim_name} from namespace "
+            logger.warning(f"Warning getting resource claim {as_resource_claim_name} from namespace "
                            f"{resource_claim_namespace} for provision UUID {resource_claim_uuid}")
             pass
 
@@ -512,6 +528,7 @@ def prepare(anarchy_subject, logger):
         'catalog_item': catalog_item_display_name,
         'current_state': resource_current_state,
         'desired_state': resource_desired_state,
+        'guid': resource_guid,
         'babylon_guid': provision_job_vars.get('guid', anarchy_subject_job_vars.get('guid')),
         'cloud_region': provision_job_vars.get('region', anarchy_subject_job_vars.get('region')),
         'cloud': cloud,
@@ -526,7 +543,9 @@ def prepare(anarchy_subject, logger):
         'manager_chargeback': 'default',
         'check_headcount': False,
         'opportunity': 'default',
-        'workshop_users': workshop_users
+        'workshop_users': workshop_users,
+        'tower_job_id': provision_job_id,
+        'purpose': provision_job_vars.get('purpose', 'development')
     }
 
     return provision
