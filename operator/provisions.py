@@ -68,7 +68,6 @@ class Provisions(object):
 
         query = f"UPDATE provisions SET \n" \
                 f"  student_id = {user_db_id}, \n" \
-                f"  catalog_id = {self.prov_data.get('catalog_id', -1)}, \n" \
                 f"  guid = {utils.parse_null_value(self.prov_data.get('guid'))}, \n" \
                 f"  cost_center = {user_cost_center}, \n" \
                 f"  student_geo = '{self.user_data.get('region')}', \n" \
