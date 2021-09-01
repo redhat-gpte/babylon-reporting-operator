@@ -341,7 +341,6 @@ def anarchysubject_event(event, logger, **_):
 
     current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
 
-    logger.info(f"Current State: {current_state} for provision uuid {resource_uuid}")
     if current_state in resource_states:
         resource_states[current_state](logger, anarchy_subject)
     else:
@@ -437,6 +436,7 @@ def prepare(anarchy_subject, logger):
     catalog_item_display_name = parse_catalog_item(resource_label_governor, resource_label_governor)
     resource_claim_requester = None
     resource_guid = None
+
     if as_resource_claim_name and resource_claim_namespace:
         try:
             resource_claim = custom_objects_api.get_namespaced_custom_object(
@@ -545,7 +545,9 @@ def prepare(anarchy_subject, logger):
         'opportunity': 'default',
         'workshop_users': workshop_users,
         'tower_job_id': provision_job_id,
-        'purpose': provision_job_vars.get('purpose', 'development')
+        'purpose': provision_job_vars.get('purpose', 'development'),
+        'anarchy_governor': resource_label_governor,
+        'anarchy_subject_name': anarchy_subject_metadata.get('name')
     }
 
     return provision

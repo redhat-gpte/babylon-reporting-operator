@@ -76,23 +76,17 @@ class Provisions(object):
                 f"WHERE \n" \
                 f"  uuid = '{self.provision_uuid}' \n" \
                 f"RETURNING uuid;"
-        self.logger.info(f"Updating Provistion {self.provision_uuid}")
 
         if self.debug:
             print(f"Query: {query}")
 
         cur = utils.execute_query(query, autocommit=True)
 
-        if cur['rowcount'] >= 1:
-            query_result = cur['query_result'][0]
-            self.logger.info(f"Updating Provision Database UUID: {query_result.get('uuid', None)}")
-
     def populate_provisions(self):
 
         # If provision UUID already exists, we have to return because UUID is primary key
         if self.check_provision_exists() != -1:
             self.update_provisions()
-            self.logger.info(f"Provision {self.provision_uuid} already exists. Skipping")
             return self.provision_uuid
 
         self.logger.info(f"Inserting Provision {self.provision_uuid}")
@@ -156,7 +150,9 @@ class Provisions(object):
                 f"  class_name, \n" \
                 f"  chargeback_method, \n" \
                 f"  manager_chargeback_id," \
-                f"  tower_job_id \n" \
+                f"  tower_job_id," \
+                f"  anarchy_governor, \n" \
+                f"  anarchy_subject_name \n" \
                 f") \n" \
                 f"VALUES ( \n" \
                 f"  '{self.prov_data.get('provisioned_at', provisioned_at)}', \n" \
@@ -187,7 +183,9 @@ class Provisions(object):
                 f"  '{self.prov_data.get('class_name', 'NULL')}', \n" \
                 f"  {self.prov_data.get('chargeback_method', utils.parse_null_value('NULL'))}, \n" \
                 f"  {user_manager_chargeback_id}, \n" \
-                f"  {utils.parse_null_value(self.prov_data.get('tower_job_id'))} \n) RETURNING uuid;"
+                f"  {utils.parse_null_value(self.prov_data.get('tower_job_id'))}, \n" \
+                f"  {utils.parse_null_value(self.prov_data.get('anarchy_governor'))}, \n" \
+                f"  {utils.parse_null_value(self.prov_data.get('anarchy_subject_name'))} \n) RETURNING uuid;"
 
         if self.debug:
             print(f"Executing Query insert provisions: {query}")
