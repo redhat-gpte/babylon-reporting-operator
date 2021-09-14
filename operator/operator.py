@@ -355,7 +355,7 @@ def anarchysubject_event(event, logger, **_):
     if event['type'] == 'DELETED' and current_state == 'destroying':
         logger.info(f"Set retirement date for provision {resource_uuid}")
         query = f"UPDATE provisions SET retired_at = timezone('utc', NOW()) \n" \
-                f"WHERE uuid = '{resource_uuid}' RETURNING uuid;"
+                f"WHERE uuid = '{resource_uuid}' and retired_at ISNULL RETURNING uuid;"
         utils.execute_query(query, autocommit=True)
         utils.provision_lifecycle(resource_uuid, 'destroy-completed', username)
         return
