@@ -119,6 +119,8 @@ def execute_query(query, positional_args=None, autocommit=False):
     rowcount = 0
     statusmessage = ''
 
+    query_result = []
+
     # Execute query:
     for query in query_list:
         try:
