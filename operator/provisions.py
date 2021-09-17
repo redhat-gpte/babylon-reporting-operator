@@ -167,7 +167,7 @@ class Provisions(object):
                 f"  '{self.prov_data.get('account', 'tests')}', \n" \
                 f"  {utils.parse_null_value(self.prov_data.get('sandbox_name', 'default'))}, \n" \
                 f"  '{provision_results}', \n" \
-                f"  '{self.prov_data.get('datasource', 'RHDPS')}', \n" \
+                f"  '{self.prov_data.get('datasource', 'BABYLON')}', \n" \
                 f"  '{self.prov_data.get('environment', 'DEV').upper()}', \n" \
                 f"  {self.prov_data.get('provisiontime', 0)}, \n" \
                 f"  {utils.parse_null_value(self.prov_data.get('cloud_region', 'default'))}, \n" \
