@@ -6,13 +6,15 @@ import kubernetes
 import os
 import requests
 import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+from kubernetes.client.rest import ApiException
 from base64 import b64decode
 import utils
 from ipa_ldap import GPTEIpaLdap
 from users import Users
 from catalog_items import CatalogItems
 from provisions import Provisions
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 anarchy_domain = os.environ.get('ANARCHY_DOMAIN', 'anarchy.gpte.redhat.com')
 anarchy_api_version = os.environ.get('ANARCHY_API_VERSION', 'v1')
@@ -41,6 +43,8 @@ def handle_event_provision_pending(logger, anarchy_subject):
 
     logger.info(f"Handle event provision pending for {resource_uuid}.")
 
+    populate_provision(logger, anarchy_subject)
+
     utils.provision_lifecycle(resource_uuid, current_state, username)
 
 
@@ -49,7 +53,7 @@ def handle_event_provisioning(logger, anarchy_subject):
 
     logger.info(f"Handle event provisioning for {resource_uuid}.")
 
-    populate_provision(logger, anarchy_subject)
+    # populate_provision(logger, anarchy_subject)
 
     utils.provision_lifecycle(resource_uuid, current_state, username)
 
@@ -76,6 +80,8 @@ def handle_event_provision_complete(logger, anarchy_subject):
 
     logger.info(f"Handle event provision complete for {resource_uuid}.")
 
+    populate_provision(logger, anarchy_subject)
+
     utils.provision_lifecycle(resource_uuid, current_state, username)
 
 
@@ -84,10 +90,7 @@ def handle_event_started(logger, anarchy_subject):
 
     logger.info(f"Handle event started for {resource_uuid}.")
 
-    provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
-
-    if provision_exists == -1:
-        handle_event_provisioning(logger, anarchy_subject)
+    populate_provision(logger, anarchy_subject)
 
     last_state = utils.last_lifecycle(resource_uuid)
     if last_state == 'provisioning':
@@ -101,10 +104,7 @@ def handle_event_start_pending(logger, anarchy_subject):
 
     logger.info(f"Handle event start pending for {resource_uuid}.")
 
-    provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
-
-    if provision_exists == -1:
-        handle_event_provisioning(logger, anarchy_subject)
+    populate_provision(logger, anarchy_subject)
 
     utils.provision_lifecycle(resource_uuid, current_state, username)
 
@@ -114,9 +114,7 @@ def handle_event_starting(logger, anarchy_subject):
 
     logger.info(f"Handle event starting for {resource_uuid}.")
 
-    provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
-    if provision_exists == -1:
-        handle_event_provisioning(logger, anarchy_subject)
+    populate_provision(logger, anarchy_subject)
 
     utils.provision_lifecycle(resource_uuid, current_state, username)
 
@@ -126,10 +124,7 @@ def handle_event_start_failed(logger, anarchy_subject):
 
     logger.info(f"Handle event start failed for {resource_uuid}.")
 
-    provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
-
-    if provision_exists == -1:
-        handle_event_provisioning(logger, anarchy_subject)
+    populate_provision(logger, anarchy_subject)
 
     last_state = utils.last_lifecycle(resource_uuid)
     if last_state == 'provisioning':
@@ -150,10 +145,7 @@ def handle_event_stop_pending(logger, anarchy_subject):
 
     logger.info(f"Handle event stop pending for {resource_uuid}.")
 
-    provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
-
-    if provision_exists == -1:
-        handle_event_provisioning(logger, anarchy_subject)
+    populate_provision(logger, anarchy_subject)
 
     utils.provision_lifecycle(resource_uuid, current_state, username)
 
@@ -163,10 +155,7 @@ def handle_event_stopping(logger, anarchy_subject):
 
     logger.info(f"Handle event stopping for {resource_uuid}.")
 
-    provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
-
-    if provision_exists == -1:
-        handle_event_provisioning(logger, anarchy_subject)
+    populate_provision(logger, anarchy_subject)
 
     utils.provision_lifecycle(resource_uuid, current_state, username)
 
@@ -176,10 +165,7 @@ def handle_event_stop_failed(logger, anarchy_subject):
 
     logger.info(f"Handle event stop failed for {resource_uuid}.")
 
-    provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
-
-    if provision_exists == -1:
-        handle_event_provisioning(logger, anarchy_subject)
+    populate_provision(logger, anarchy_subject)
 
     utils.provision_lifecycle(resource_uuid, current_state, username)
 
@@ -189,10 +175,7 @@ def handle_event_stopped(logger, anarchy_subject):
 
     logger.info(f"Handle event stopped for {resource_uuid}.")
 
-    provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
-
-    if provision_exists == -1:
-        handle_event_provisioning(logger, anarchy_subject)
+    populate_provision(logger, anarchy_subject)
 
     utils.provision_lifecycle(resource_uuid, current_state, username)
 
@@ -202,10 +185,7 @@ def handle_event_destroying(logger, anarchy_subject):
 
     logger.info(f"Handle event destroying for {resource_uuid}.")
 
-    provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
-
-    if provision_exists == -1:
-        handle_event_provisioning(logger, anarchy_subject)
+    populate_provision(logger, anarchy_subject)
 
     utils.provision_lifecycle(resource_uuid, current_state, username)
 
@@ -215,10 +195,7 @@ def handle_event_destroy_failed(logger, anarchy_subject):
 
     logger.info(f"Handle event destroy failed for {resource_uuid}.")
 
-    provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
-
-    if provision_exists == -1:
-        handle_event_provisioning(logger, anarchy_subject)
+    populate_provision(logger, anarchy_subject)
 
     utils.provision_lifecycle(resource_uuid, current_state, username)
 
@@ -228,10 +205,7 @@ def handle_event_destroy_canceled(logger, anarchy_subject):
 
     logger.info(f"Handle event destroy failed for {resource_uuid}.")
 
-    provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
-
-    if provision_exists == -1:
-        handle_event_provisioning(logger, anarchy_subject)
+    populate_provision(logger, anarchy_subject)
 
     utils.provision_lifecycle(resource_uuid, current_state, username)
 
@@ -306,22 +280,10 @@ def anarchysubject_event(event, logger, **_):
 
     current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
 
-    if current_state in resource_states:
-        resource_states[current_state](logger, anarchy_subject)
-    else:
-        logger.warning(f"Current state '{current_state}' not found")
-        return
-
-    if not current_state or current_state in ('new', 'provision-pending'):
-        logger.warning(f"Current State '{anarchy_subject_spec_vars.get('current_state')}'. We have to ignore it!")
-        return
-
     if event['type'] == 'DELETED' and current_state == 'destroying':
         logger.info(f"Set retirement date for provision {resource_uuid}")
-        provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
 
-        if provision_exists == -1:
-            handle_event_provisioning(logger, anarchy_subject)
+        populate_provision(logger, anarchy_subject)
 
         query = f"UPDATE provisions SET retired_at = timezone('utc', NOW()) \n" \
                 f"WHERE uuid = '{resource_uuid}' and retired_at ISNULL RETURNING uuid;"
@@ -330,18 +292,46 @@ def anarchysubject_event(event, logger, **_):
         return
 
 
+    if current_state in resource_states:
+        resource_states[current_state](logger, anarchy_subject)
+    else:
+        logger.warning(f"Current state '{current_state}' not found")
+        return
+
+    if not current_state or current_state in ('new', 'provision-pending'):
+        logger.warning(f"Provision: {resource_uuid} - "
+                       f"Current State: '{anarchy_subject_spec_vars.get('current_state')}'. "
+                       f"We have to ignore it!")
+        return
+
+
 def populate_provision(logger, anarchy_subject):
+    invalid_states = ['provision-pending', 'provisioning']
+    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
+    if current_state in invalid_states:
+        return
+
     provision = prepare(anarchy_subject, logger)
-
     if provision:
-        user_name = provision.get('username')
-        provision['user'] = search_ipa_user(user_name, logger)
-        # logger.info(f"Parsing Provisions Values for provision UUID {resource_uuid}: {provision}")
-        provision['user_db'] = populate_user(provision, logger)
-        provision['catalog_id'] = populate_catalog(provision, logger)
+        provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
 
-        prov = Provisions(logger, provision)
-        prov.populate_provisions()
+        if provision_exists == -1:
+            prov = Provisions(logger, provision)
+            user_name = provision.get('username')
+            if user_name is None:
+                logger.warning(f"Unable to get username for provision {provision.get('uuid')} - "
+                               f"Current State: {provision.get('current_state')} - "
+                               f"anarchy_subject_name: {provision.get('anarchy_subject_name')} -"
+                               f"anarchy_governor: {provision.get('anarchy_governor')}")
+                provision['user'] = {}
+            else:
+                provision['user'] = search_ipa_user(user_name, logger)
+
+            # logger.info(f"Parsing Provisions Values for provision UUID {resource_uuid}: {provision}")
+            provision['user_db'] = populate_user(provision, logger)
+            provision['catalog_id'] = populate_catalog(provision, logger)
+
+            prov.populate_provisions()
 
 
 def populate_catalog(provision, logger):
@@ -358,7 +348,7 @@ def populate_user(provision, logger):
         results = {'user_id': 'default',
                    'manager_chargeback_id': 'default',
                    'manager_id': 'default',
-                   'cost_center': '441'
+                   'cost_center': 'default'
          }
     else:
         results = users.populate_users()
@@ -366,17 +356,24 @@ def populate_user(provision, logger):
 
 
 def search_ipa_user(user_name, logger):
+    if user_name == 'None':
+        return {}
+
     logger.info(f"Searching IPA username '{user_name}'")
     ipa_user = GPTEIpaLdap(logger)
     results = ipa_user.search_ipa_user(user_name)
-    # logger.info(f"'search_ipa_user': {results}")
+    # print(f"'search_ipa_user': {json.dumps(results, indent=2)}")
     return results
 
 
 def parse_catalog_item(catalog_display_name, catalog_item_display_name):
-    name_list = catalog_display_name.split('.')
-    ci_name = name_list[1]
-    return  ci_name.strip()
+    ci_name = catalog_display_name
+
+    if '.' in catalog_display_name:
+        name_list = catalog_display_name.split('.')
+        ci_name = name_list[1]
+
+    return ci_name.strip()
 
 
 def get_resource_vars(anarchy_subject):
@@ -388,34 +385,21 @@ def get_resource_vars(anarchy_subject):
 
     current_state = anarchy_subject_spec_vars.get('current_state')
 
-    # TODO: Try to get username from resource_claim
-    username = anarchy_subject_annotations.get(
-        f"{poolboy_domain}/resource-requester-preferred-username")
-
     resource_uuid = anarchy_subject_job_vars.get('uuid',
                                                  anarchy_subject_annotations.get(
                                                      f"{poolboy_domain}/resource-handle-uid")
                                                  )
 
-    as_resource_claim_name = anarchy_subject_annotations.get(f"{poolboy_domain}/resource-claim-name")
     resource_claim_namespace = anarchy_subject_annotations.get(f"{poolboy_domain}/resource-claim-namespace")
 
-    if as_resource_claim_name and resource_claim_namespace:
+    # Get user name from poolboy annotation and fallback to namespace name
+    username = anarchy_subject_annotations.get(
+        f"{poolboy_domain}/resource-requester-user")
 
-        try:
-            resource_claim = custom_objects_api.get_namespaced_custom_object(
-                poolboy_domain, poolboy_api_version,
-                resource_claim_namespace, 'resourceclaims', as_resource_claim_name
-            )
-            resource_claim_metadata = resource_claim['metadata']
-            resource_claim_annotations = resource_claim_metadata['annotations']
-
-            username = anarchy_subject_annotations.get(
-                f"{poolboy_domain}/resource-requester-preferred-username",
-                resource_claim_annotations.get(f"{babylon_domain}/requester"))
-
-        except Exception as e:
-            print(f"ERROR: Reading resource claim {as_resource_claim_name} - UUID {resource_uuid}")
+    if resource_claim_namespace and not username:
+        replace = '.'
+        temp_username = resource_claim_namespace.replace('user-', '')
+        username = replace.join(temp_username.rsplit('-', 1))
 
     desired_state = anarchy_subject_spec_vars.get('desired_state')
     babylon_guid = anarchy_subject_job_vars.get('guid')
@@ -452,61 +436,81 @@ def prepare(anarchy_subject, logger):
 
     resource_current_state = anarchy_subject_spec_vars.get('current_state')
     resource_desired_state = anarchy_subject_spec_vars.get('desired_state')
-    logger.info(f"Resource UUID: {resource_claim_uuid} - Resource Current State: {resource_current_state} - Resource Desired State: {resource_desired_state}")
-
-    # I've to wait until I have all data from Tower and all variables used
-    if resource_current_state and 'provision-pending' in resource_current_state:
-        logger.info(f"Waiting for provisioning state for {resource_claim_uuid}")
-        return
+    logger.info(f"Resource UUID: {resource_claim_uuid} - "
+                f"Resource Current State: {resource_current_state} - "
+                f"Resource Desired State: {resource_desired_state}")
 
     catalog_display_name = parse_catalog_item(resource_label_governor, resource_label_governor)
     catalog_item_display_name = parse_catalog_item(resource_label_governor, resource_label_governor)
-    resource_claim_requester = None
     resource_guid = None
 
-    if as_resource_claim_name and resource_claim_namespace:
+    # Get user name from poolboy annotation and fallback to namespace name
+    resource_claim_requester = anarchy_subject_annotations.get(
+        f"{poolboy_domain}/resource-requester-user")
+
+    if resource_claim_namespace and not resource_claim_requester:
+        replace = '.'
+        temp_username = resource_claim_namespace.replace('user-', '')
+        resource_claim_requester = replace.join(temp_username.rsplit('-', 1))
+
+    logger.info(f"Provision UUID: {resource_claim_uuid} - "
+                f"Resource Claim Namespace: {resource_claim_namespace} - "
+                f"Resource Claim Name: {as_resource_claim_name} - "
+                f"Resource Current State: {resource_current_state}")
+
+    if as_resource_claim_name and resource_claim_namespace and \
+            resource_current_state not in ('destroying', 'destroy-failed',
+                                           'provisioning', 'starting'):
         try:
             resource_claim = custom_objects_api.get_namespaced_custom_object(
                 poolboy_domain, poolboy_api_version,
                 resource_claim_namespace, 'resourceclaims', as_resource_claim_name
             )
+
             resource_claim_metadata = resource_claim['metadata']
             resource_claim_annotations = resource_claim_metadata['annotations']
             resource_claim_labels = resource_claim_metadata['labels']
+
+            utils.save_resource_claim_data(resource_claim_uuid, as_resource_claim_name,
+                                           resource_claim_namespace, resource_claim)
 
             # Used by CloudForms
             notifier = resource_claim_annotations.get(f'{babylon_domain}/notifier', None)
             if notifier and notifier == 'disable':
                 resource_name = resource_claim_metadata.get('name', 'default')
-                resource_guid = resource_name[-4:]
-
-            # This is the resource requester
-            # TODO: Check the provision uuid 2db7758d-c93d-557f-a191-960edd1a348d
-            # TODO: anarchy_subject: openstack.sap-smart-management.prod-nkjrj
-            # TODO: anarchy_governor: openstack.sap-smart-management.prod
-            resource_claim_requester = anarchy_subject_annotations.get(
-                f"{poolboy_domain}/resource-requester-preferred-username",
-                resource_claim_annotations.get(f"{babylon_domain}/requester"))
+                if resource_name != 'default':
+                    resource_guid = resource_name[-4:]
 
             # if babylon/catalogDisplayName get it from labels/{babylon_domain}/catalogItemName
             # else, try to get it from resource_claim lables or finally using resource_label_governor
-            catalog_display_name = resource_claim_annotations.get(f"{babylon_domain}/catalogDisplayName",
-                                                      resource_claim_labels.get(f"{babylon_domain}/catalogItemName",
-                                                                                resource_label_governor))
-            catalog_item_display_name = resource_claim_annotations.get(f"{babylon_domain}/catalogItemDisplayName",
-                                                           resource_claim_labels.get(f"{babylon_domain}/catalogItemName",
-                                                                                     resource_label_governor))
+            catalog_display_name = resource_claim_annotations.get(
+                f"{babylon_domain}/catalogDisplayName",
+                resource_claim_labels.get(f"{babylon_domain}/catalogItemName",
+                                          resource_label_governor)
+            )
 
-            logger.info(f"catalog_display_name: {catalog_display_name} "
+            catalog_item_display_name = resource_claim_annotations.get(
+                f"{babylon_domain}/catalogItemDisplayName",
+                resource_claim_labels.get(f"{babylon_domain}/catalogItemName",
+                                          resource_label_governor)
+            )
+
+            logger.info(f"Provision UUID: {resource_claim_uuid} "
+                        f"catalog_display_name: {catalog_display_name} "
                         f"catalog_item_display_name: {catalog_item_display_name}")
             catalog_display_name = parse_catalog_item(catalog_display_name, catalog_item_display_name)
             catalog_item_display_name = catalog_display_name
 
-        except Exception as e:
-            logger.warning(f"Warning getting resource claim {as_resource_claim_name} from namespace "
-                           f"{resource_claim_namespace} for provision UUID {resource_claim_uuid}")
+        except ApiException as e:
+            if e.status == '404':
+                logger.warning(f"Resource Claim not found {as_resource_claim_name} "
+                               f"from namespace {resource_claim_namespace} for provision "
+                               f"UUID {resource_claim_uuid} - current_state: {resource_current_state}  - {e.status}")
+                pass
+            logger.warning(f"Unable to get namespace custom object resource claim {as_resource_claim_name} "
+                           f"from namespace {resource_claim_namespace} for provision "
+                           f"UUID {resource_claim_uuid} - current_state: {resource_current_state} - {e}")
             pass
-
     provision_job_start_timestamp = utils.timestamp_to_utc(provision_job.get('startTimestamp'))
     provision_job_complete_timestamp = utils.timestamp_to_utc(provision_job.get('completeTimestamp'))
     provision_time = None
@@ -521,6 +525,8 @@ def prepare(anarchy_subject, logger):
         )
         provision_tower_job = resp.json()
         provision_job_vars = json.loads(provision_tower_job.get('extra_vars', '{}'))
+        utils.save_provision_vars(resource_claim_uuid, as_resource_claim_name, resource_claim_namespace,
+                                  provision_job_vars)
 
     class_list = resource_label_governor.split('.')
     class_name = f"{class_list[2]}_{class_list[1].replace('-', '_')}".upper()
@@ -581,4 +587,3 @@ def prepare(anarchy_subject, logger):
     }
 
     return provision
-

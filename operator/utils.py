@@ -14,6 +14,7 @@ from retrying import retry
 
 global db_connection
 
+
 def list_to_pg_array(elem):
     """Convert the passed list to PostgreSQL array
     represented as a string.
@@ -185,7 +186,9 @@ def execute_query(query, positional_args=None, autocommit=False):
                   "Error: %s, \n"
                   "query list: %s\n"
                   "" % (query, arguments, e, query_list))
-
+        # finally:
+        #     cursor.close()
+        #     db_connection.putconn(db_pool_conn)
     if autocommit:
         db_pool_conn.commit()
 
@@ -199,8 +202,13 @@ def execute_query(query, positional_args=None, autocommit=False):
         rowcount=rowcount,
     )
 
-    cursor.close()
-    db_connection.putconn(db_pool_conn)
+    try:
+        cursor.close()
+        db_connection.putconn(db_pool_conn)
+    except Exception as e:
+        print(f"ERROR closing connection {e}")
+        pass
+
     return kw
 
 
@@ -325,10 +333,20 @@ def last_lifecycle(provision_uuid):
 
 
 def provision_lifecycle(provision_uuid, current_state, username):
+
     last_state = last_lifecycle(provision_uuid)
 
     if last_state == current_state:
         return
+
+    print(f"Updating provision {provision_uuid} - last_state = {current_state}")
+    positional_args = [current_state, provision_uuid]
+    query = f"UPDATE provisions SET \n" \
+            f"  last_state = %s, \n" \
+            f"  modified_at = timezone('UTC', NOW())" \
+            f"WHERE uuid = %s RETURNING uuid;"
+
+    cur = execute_query(query, autocommit=True, positional_args=positional_args)
 
     if username is None:
         username = 'gpte-user'
@@ -361,6 +379,103 @@ def check_provision_exists(provision_uuid, babylon_guid):
         return query_result
     else:
         return -1
+
+
+def save_resource_claim_data(resource_claim_uuid, as_resource_claim_name, resource_claim_namespace, resource_claim):
+    if len(resource_claim) == 0:
+        print('Resource Claim log size 0, do not insert into db')
+        return
+
+    resource_claim_metadata = resource_claim.get('metadata', {})
+    resource_claim_metadata.pop('managedFields')
+
+    resource_claim_log = {}
+    resource_claim_log.update({'metadata': resource_claim_metadata})
+
+    # first check if already exists
+    query = f"SELECT count(*) as total \n" \
+            f"FROM resource_claim_log \n" \
+            f"WHERE \n" \
+            f"  provision_uuid = %s AND \n" \
+            f"  resource_claim_name = %s AND \n" \
+            f"  resource_claim_namespace = %s"
+    positional_args = [resource_claim_uuid, as_resource_claim_name, resource_claim_namespace]
+
+    results = execute_query(query=query, positional_args=positional_args)
+
+    query_result = results['query_result'][0]
+
+    if results['rowcount'] == 1 and query_result.get('total') == 0:
+        print("Inserting new resource claim log")
+        positional_args = [resource_claim_uuid, as_resource_claim_name, resource_claim_namespace,
+                           json.dumps(resource_claim_log)]
+        query = 'INSERT INTO resource_claim_log (' \
+                '  provision_uuid, \n' \
+                '  resource_claim_name, \n' \
+                '  resource_claim_namespace, \n' \
+                '  resource_claim_json) \n' \
+                'VALUES ( %s, %s, %s, %s ) \n' \
+                'RETURNING provision_uuid'
+
+        execute_query(query=query, positional_args=positional_args, autocommit=True)
+
+    elif results['rowcount'] > 1:
+        print("Updating resource claim log")
+        positional_args = [as_resource_claim_name, resource_claim_namespace,
+                           json.dumps(resource_claim_log), resource_claim_uuid]
+        query = 'UPDATE resource_claim_log SET' \
+                '  resource_claim_name = %s, \n' \
+                '  resource_claim_namespace = %s, \n' \
+                '  resource_claim_json = %s \n' \
+                'WHERE  provision_uuid = %s \n' \
+                'RETURNING provision_uuid'
+        execute_query(query=query, positional_args=positional_args, autocommit=True)
+
+
+def save_provision_vars(resource_claim_uuid, as_resource_claim_name, resource_claim_namespace, provision_vars):
+    if len(provision_vars) == 0:
+        print('Provision vars size 0, do not insert into db')
+        return
+
+    # first check if already exists
+    query = f"SELECT count(*) as total \n" \
+            f"FROM resource_claim_log \n" \
+            f"WHERE \n" \
+            f"  provision_uuid = %s AND \n" \
+            f"  resource_claim_name = %s AND \n" \
+            f"  resource_claim_namespace = %s"
+    positional_args = [resource_claim_uuid, as_resource_claim_name, resource_claim_namespace]
+
+    results = execute_query(query=query, positional_args=positional_args)
+
+    query_result = results['query_result'][0]
+
+    if results['rowcount'] == 1 and query_result.get('total') == 0:
+        print("Inserting new provision vars log")
+        positional_args = [resource_claim_uuid, as_resource_claim_name, resource_claim_namespace,
+                           json.dumps(provision_vars)]
+        query = 'INSERT INTO resource_claim_log (' \
+                '  provision_uuid, \n' \
+                '  resource_claim_name, \n' \
+                '  resource_claim_namespace, \n' \
+                '  provision_vars_json) \n' \
+                'VALUES ( %s, %s, %s, %s ) \n' \
+                'RETURNING provision_uuid'
+
+        execute_query(query=query, positional_args=positional_args, autocommit=True)
+
+    elif results['rowcount'] > 1:
+        print("Updating resource provision vars log")
+        positional_args = [as_resource_claim_name, resource_claim_namespace,
+                           json.dumps(provision_vars), resource_claim_uuid]
+        query = 'UPDATE resource_claim_log SET' \
+                '  resource_claim_name = %s, \n' \
+                '  resource_claim_namespace = %s, \n' \
+                '  provision_vars_json = %s \n' \
+                'WHERE  provision_uuid = %s \n' \
+                'RETURNING provision_uuid'
+
+        execute_query(query=query, positional_args=positional_args, autocommit=True)
 
 
 def timestamp_to_utc(timestamp_received):
