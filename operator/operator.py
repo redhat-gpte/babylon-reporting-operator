@@ -53,8 +53,6 @@ def handle_event_provisioning(logger, anarchy_subject):
 
     logger.info(f"Handle event provisioning for {resource_uuid}.")
 
-    # populate_provision(logger, anarchy_subject)
-
     utils.provision_lifecycle(resource_uuid, current_state, username)
 
 
@@ -327,7 +325,6 @@ def populate_provision(logger, anarchy_subject):
             else:
                 provision['user'] = search_ipa_user(user_name, logger)
 
-            # logger.info(f"Parsing Provisions Values for provision UUID {resource_uuid}: {provision}")
             provision['user_db'] = populate_user(provision, logger)
             provision['catalog_id'] = populate_catalog(provision, logger)
 
@@ -362,7 +359,6 @@ def search_ipa_user(user_name, logger):
     logger.info(f"Searching IPA username '{user_name}'")
     ipa_user = GPTEIpaLdap(logger)
     results = ipa_user.search_ipa_user(user_name)
-    # print(f"'search_ipa_user': {json.dumps(results, indent=2)}")
     return results
 
 

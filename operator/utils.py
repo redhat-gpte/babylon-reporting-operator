@@ -186,9 +186,6 @@ def execute_query(query, positional_args=None, autocommit=False):
                   "Error: %s, \n"
                   "query list: %s\n"
                   "" % (query, arguments, e, query_list))
-        # finally:
-        #     cursor.close()
-        #     db_connection.putconn(db_pool_conn)
     if autocommit:
         db_pool_conn.commit()
 
