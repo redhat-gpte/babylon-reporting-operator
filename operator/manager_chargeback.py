@@ -15,4 +15,3 @@ class ManagerChargeback(object):
             manager_list.update({m['email']: m['id']})
 
         return manager_list
-

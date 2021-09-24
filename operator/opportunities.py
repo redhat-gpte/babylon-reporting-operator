@@ -253,4 +253,3 @@ class Opportunities(SalesForce):
             query_result = cur['query_result'][0]
             self.logger.info(f"Opportunity Database ID: {query_result.get('id')}")
         return True
-

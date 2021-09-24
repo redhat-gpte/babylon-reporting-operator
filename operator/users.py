@@ -312,4 +312,3 @@ class Users(GPTELdap):
             'cost_center': self.user_data.get('cost_center')
         }
         return results
-
