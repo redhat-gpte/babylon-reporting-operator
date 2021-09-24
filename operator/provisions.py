@@ -8,7 +8,7 @@ class Provisions(object):
         self.debug = False
         self.logger = logger
         self.prov_data = prov_data
-        self.user_data = self.prov_data.get('user')
+        self.user_data = self.prov_data.get('user', {})
         self.provision_uuid = self.prov_data.get('uuid')
         self.provision_guid = self.prov_data.get('guid', self.prov_data.get('babylon_guid'))
 
@@ -63,7 +63,7 @@ class Provisions(object):
         user_db_info = self.prov_data.get('user_db', {})
         user_db_id = user_db_info.get('user_id', None)
         user_manager_id = user_db_info.get('manager_id')
-        user_manager_chargeback_id  = user_db_info.get('manager_chargeback_id')
+        user_manager_chargeback_id = user_db_info.get('manager_chargeback_id')
         user_cost_center = user_db_info.get('cost_center', '441')
 
         query = f"UPDATE provisions SET \n" \
@@ -72,7 +72,9 @@ class Provisions(object):
                 f"  cost_center = {user_cost_center}, \n" \
                 f"  student_geo = '{self.user_data.get('region')}', \n" \
                 f"  manager_id = {user_manager_id}, \n" \
-                f"  manager_chargeback_id = {user_manager_chargeback_id} \n" \
+                f"  manager_chargeback_id = {user_manager_chargeback_id}, \n" \
+                f"  modified_at = timezone('UTC', NOW()), \n" \
+                f"  last_state = '{self.prov_data.get('current_state')}'" \
                 f"WHERE \n" \
                 f"  uuid = '{self.provision_uuid}' \n" \
                 f"RETURNING uuid;"
@@ -103,7 +105,7 @@ class Provisions(object):
         purpose_id = purpose_id.get('id')
 
         user_db_info = self.prov_data.get('user_db', {})
-        user_db_id = user_db_info.get('user_id')
+        user_db_id = utils.parse_null_value(user_db_info.get('user_id', 'default'))
         user_manager_id = user_db_info.get('manager_id')
         user_manager_chargeback_id  = user_db_info.get('manager_chargeback_id')
         user_cost_center = user_db_info.get('cost_center')
@@ -152,10 +154,12 @@ class Provisions(object):
                 f"  manager_chargeback_id," \
                 f"  tower_job_id," \
                 f"  anarchy_governor, \n" \
-                f"  anarchy_subject_name \n" \
+                f"  anarchy_subject_name, \n" \
+                f"  modified_at," \
+                f"  last_state \n" \
                 f") \n" \
                 f"VALUES ( \n" \
-                f"  '{self.prov_data.get('provisioned_at', provisioned_at)}', \n" \
+                f"  {utils.parse_null_value(self.prov_data.get('provisioned_at', provisioned_at))}, \n" \
                 f"  {user_db_id}, \n" \
                 f"  {catalog_id}, \n" \
                 f"  {self.prov_data.get('workshop_users', 'default')}, \n" \
@@ -178,14 +182,17 @@ class Provisions(object):
                 f"  {purpose_id}, \n" \
                 f"  {self.prov_data.get('tshirt_size', 'default')}, \n" \
                 f"  {user_cost_center}, \n" \
-                f"  '{self.user_data.get('region')}', \n" \
+                f"  {utils.parse_null_value(self.user_data.get('region', 'default'))}, \n" \
                 f"  {user_manager_id}, \n" \
                 f"  '{self.prov_data.get('class_name', 'NULL')}', \n" \
                 f"  {self.prov_data.get('chargeback_method', utils.parse_null_value('NULL'))}, \n" \
                 f"  {user_manager_chargeback_id}, \n" \
                 f"  {utils.parse_null_value(self.prov_data.get('tower_job_id'))}, \n" \
                 f"  {utils.parse_null_value(self.prov_data.get('anarchy_governor'))}, \n" \
-                f"  {utils.parse_null_value(self.prov_data.get('anarchy_subject_name'))} \n) RETURNING uuid;"
+                f"  {utils.parse_null_value(self.prov_data.get('anarchy_subject_name'))}, \n" \
+                f"  timezone('UTC', NOW())," \
+                f"  '{current_state}' \n" \
+                f") RETURNING uuid;"
 
         if self.debug:
             print(f"Executing Query insert provisions: {query}")
@@ -197,5 +204,3 @@ class Provisions(object):
             self.logger.info(f"Provision Database UUID: {query_result.get('uuid', None)}")
 
         return self.provision_uuid
-
-
