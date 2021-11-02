@@ -153,7 +153,10 @@ class Users(GPTELdap):
         user_cost_center = user_data.get('rhatCostCenter', 'default')
         user_geo = user_data.get('rhatGeo', 'default')
 
-        manager_id = self.populate_manager().get('id', 'default')
+        if self.manager_mail == 'default':
+            manager_id = 'default'
+        else:
+            manager_id = self.populate_manager().get('id', 'default')
 
         if self.debug:
             print("search_internal_user: \n"
@@ -245,8 +248,8 @@ class Users(GPTELdap):
         if self.user_data['user_id'] >= 1:
             # TODO: Student exists, update??
             user_title = self.user_data.get('title')
-            user_manager = self.manager_data.get('cn')
-            user_manager_mail = self.manager_data.get('mail')
+            user_manager = self.manager_data.get('cn', 'default')
+            user_manager_mail = self.manager_data.get('mail', 'default')
             query = f"UPDATE students SET \n" \
                     f"  geo = {user_geo}, \n" \
                     f"  partner = {self.user_data.get('partner')}, \n" \
@@ -289,8 +292,8 @@ class Users(GPTELdap):
                     f"  {self.user_data.get('cost_center')}, \n" \
                     f"  NOW(), \n" \
                     f"  {self.user_data.get('kerberos_id')}, \n" \
-                    f"  {self.manager_data.get('cn')}, \n" \
-                    f"  {self.manager_data.get('mail')}, \n" \
+                    f"  {self.manager_data.get('cn', 'default')}, \n" \
+                    f"  {self.manager_data.get('mail', 'default')}, \n" \
                     f"  {self.user_data.get('title')}, \n" \
                     f"  '{user_first_name}', \n" \
                     f"  '{user_last_name}', \n" \
