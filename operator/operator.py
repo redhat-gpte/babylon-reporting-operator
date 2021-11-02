@@ -311,24 +311,22 @@ def populate_provision(logger, anarchy_subject):
 
     provision = prepare(anarchy_subject, logger)
     if provision:
-        provision_exists = utils.check_provision_exists(resource_uuid, babylon_guid)
 
-        if provision_exists == -1:
-            prov = Provisions(logger, provision)
-            user_name = provision.get('username')
-            if user_name is None:
-                logger.warning(f"Unable to get username for provision {provision.get('uuid')} - "
-                               f"Current State: {provision.get('current_state')} - "
-                               f"anarchy_subject_name: {provision.get('anarchy_subject_name')} -"
-                               f"anarchy_governor: {provision.get('anarchy_governor')}")
-                provision['user'] = {}
-            else:
-                provision['user'] = search_ipa_user(user_name, logger)
+        user_name = provision.get('username')
+        if user_name is None:
+            logger.warning(f"Unable to get username for provision {provision.get('uuid')} - "
+                           f"Current State: {provision.get('current_state')} - "
+                           f"anarchy_subject_name: {provision.get('anarchy_subject_name')} -"
+                           f"anarchy_governor: {provision.get('anarchy_governor')}")
+            provision['user'] = {}
+        else:
+            provision['user'] = search_ipa_user(user_name, logger)
 
-            provision['user_db'] = populate_user(provision, logger)
-            provision['catalog_id'] = populate_catalog(provision, logger)
+        provision['user_db'] = populate_user(provision, logger)
+        provision['catalog_id'] = populate_catalog(provision, logger)
 
-            prov.populate_provisions()
+        prov = Provisions(logger, provision)
+        prov.populate_provisions()
 
 
 def populate_catalog(provision, logger):
