@@ -403,7 +403,6 @@ def save_resource_claim_data(resource_claim_uuid, as_resource_claim_name, resour
     query_result = results['query_result'][0]
 
     if results['rowcount'] == 1 and query_result.get('total') == 0:
-        print("Inserting new resource claim log")
         positional_args = [resource_claim_uuid, as_resource_claim_name, resource_claim_namespace,
                            json.dumps(resource_claim_log)]
         query = 'INSERT INTO resource_claim_log (' \
@@ -417,7 +416,6 @@ def save_resource_claim_data(resource_claim_uuid, as_resource_claim_name, resour
         execute_query(query=query, positional_args=positional_args, autocommit=True)
 
     elif results['rowcount'] > 1:
-        print("Updating resource claim log")
         positional_args = [as_resource_claim_name, resource_claim_namespace,
                            json.dumps(resource_claim_log), resource_claim_uuid]
         query = 'UPDATE resource_claim_log SET' \
@@ -448,7 +446,6 @@ def save_provision_vars(resource_claim_uuid, as_resource_claim_name, resource_cl
     query_result = results['query_result'][0]
 
     if results['rowcount'] == 1 and query_result.get('total') == 0:
-        print("Inserting new provision vars log")
         positional_args = [resource_claim_uuid, as_resource_claim_name, resource_claim_namespace,
                            json.dumps(provision_vars)]
         query = 'INSERT INTO resource_claim_log (' \
@@ -462,7 +459,6 @@ def save_provision_vars(resource_claim_uuid, as_resource_claim_name, resource_cl
         execute_query(query=query, positional_args=positional_args, autocommit=True)
 
     elif results['rowcount'] > 1:
-        print("Updating resource provision vars log")
         positional_args = [as_resource_claim_name, resource_claim_namespace,
                            json.dumps(provision_vars), resource_claim_uuid]
         query = 'UPDATE resource_claim_log SET' \

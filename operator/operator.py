@@ -394,6 +394,7 @@ def get_resource_vars(anarchy_subject):
         replace = '.'
         temp_username = resource_claim_namespace.replace('user-', '')
         username = replace.join(temp_username.rsplit('-', 1))
+        username = username.replace('-', '.', 1)
 
     desired_state = anarchy_subject_spec_vars.get('desired_state')
     babylon_guid = anarchy_subject_job_vars.get('guid')
@@ -464,6 +465,7 @@ def prepare(anarchy_subject, logger):
             resource_claim_metadata = resource_claim['metadata']
             resource_claim_annotations = resource_claim_metadata['annotations']
             resource_claim_labels = resource_claim_metadata['labels']
+            resource_claim_requester = resource_claim_annotations.get(f'{babylon_domain}/requester')
 
             utils.save_resource_claim_data(resource_claim_uuid, as_resource_claim_name,
                                            resource_claim_namespace, resource_claim)
