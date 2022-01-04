@@ -387,8 +387,11 @@ def get_resource_vars(anarchy_subject):
     resource_claim_namespace = anarchy_subject_annotations.get(f"{poolboy_domain}/resource-claim-namespace")
 
     # Get user name from poolboy annotation and fallback to namespace name
-    username = anarchy_subject_annotations.get(
-        f"{poolboy_domain}/resource-requester-user")
+    if f'{babylon_domain}/requester' in anarchy_subject_annotations:
+        username = anarchy_subject_annotations.get(f"{babylon_domain}/requester")
+    else:
+        username = anarchy_subject_annotations.get(
+            f"{poolboy_domain}/resource-requester-user")
 
     if resource_claim_namespace and not username:
         replace = '.'
@@ -465,7 +468,8 @@ def prepare(anarchy_subject, logger):
             resource_claim_metadata = resource_claim['metadata']
             resource_claim_annotations = resource_claim_metadata['annotations']
             resource_claim_labels = resource_claim_metadata['labels']
-            resource_claim_requester = resource_claim_annotations.get(f'{babylon_domain}/requester')
+            if f'{babylon_domain}/requester' in resource_claim_annotations:
+                resource_claim_requester = resource_claim_annotations.get(f'{babylon_domain}/requester')
 
             utils.save_resource_claim_data(resource_claim_uuid, as_resource_claim_name,
                                            resource_claim_namespace, resource_claim)
