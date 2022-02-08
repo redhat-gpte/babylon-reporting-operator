@@ -25,14 +25,20 @@ class Users(GPTELdap):
             check_headcount,
         )
         """
+
+        positional_args = [self.user_mail]
         query = f"SELECT id, check_headcount FROM students " \
-                f"WHERE email = '{self.user_mail}' ORDER BY created_at"
-        result = utils.execute_query(query)
-        if result['rowcount'] >= 1:
-            query_result = result['query_result'][0]
-            return query_result
-        else:
-            return -1
+                f"WHERE email = %s ORDER BY created_at"
+
+        try:
+            result = utils.execute_query(query, positional_args=positional_args, autocommit=True)
+            if result['rowcount'] >= 1:
+                query_result = result['query_result'][0]
+                return query_result
+        except Exception:
+            self.logger.error("Error check user exists", exec_info=True)
+
+        return -1
 
     def get_company_id(self):
         """
@@ -60,14 +66,21 @@ class Users(GPTELdap):
         Check if manager already exists in the managers table
         :return: manager_id or -1 if the manager doesn't exists yet
         """
+
+        positional_args = [self.manager_mail]
         query = f"SELECT id FROM manager " \
-                f"WHERE email = {utils.parse_null_value(self.manager_mail)}"
-        result = utils.execute_query(query)
-        if result['rowcount'] >= 1:
-            query_result = result['query_result'][0]
-            return query_result
-        else:
-            return -1
+                f"WHERE email = %s"
+
+        try:
+            result = utils.execute_query(query, positional_args=positional_args, autocommit=True)
+
+            if result['rowcount'] >= 1:
+                query_result = result['query_result'][0]
+                return query_result
+        except Exception:
+            self.logger.error("Error check manager exists", exec_info=True)
+
+        return -1
 
     def populate_manager(self):
         """
@@ -77,16 +90,23 @@ class Users(GPTELdap):
         manager_id = self.check_manager_exists()
         # If manager doesn't exists insert into
         if manager_id == -1:
+            positional_args = [self.manager_data.get('cn'), self.manager_data.get('mail'),
+                               self.manager_data.get('uid')]
             query = f"INSERT INTO manager (name, email, kerberos_id) \n" \
                     f"VALUES ( \n" \
-                    f"  '{self.manager_data['cn']}', \n" \
-                    f"  '{self.manager_data['mail']}', \n" \
-                    f"  '{self.manager_data['uid']}') RETURNING id;"
-            result = utils.execute_query(query, autocommit=True)
-            if result['rowcount'] >= 1:
-                manager_id = result['query_result'][0]
-            else:
-                return -1
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s ) RETURNING id;"
+            try:
+                result = utils.execute_query(query, positional_args=positional_args, autocommit=True)
+
+                if result['rowcount'] >= 1:
+                    manager_id = result['query_result'][0]
+                    return manager_id
+                else:
+                    return -1
+            except Exception:
+                self.logger.error("Error check manager exists", exec_info=True)
         else:
             # TODO: Update Manager????
             pass
@@ -120,7 +140,7 @@ class Users(GPTELdap):
 
         if isinstance(chargeback_manager_mail, dict) or \
                 chargeback_manager_mail == 'gpte@redhat.com':
-            manager_chargeback_id = 'default'
+            manager_chargeback_id = None
         else:
             manager_chargeback_id = manager_list[chargeback_manager_mail]
 
@@ -229,43 +249,50 @@ class Users(GPTELdap):
         user_results = self.check_user_exists()
         if isinstance(user_results, dict):
             self.user_data['user_id'] = user_results.get('id', -1)
-            self.user_data['check_headcount'] = user_results.get('check_headcount', True)
+            self.user_data['check_headcount'] = True
         else:
             self.user_data['user_id'] = -1
             self.user_data['check_headcount'] = True
 
         company_id = self.get_company_id()
 
-        user_geo = utils.parse_null_value(self.user_data.get('rhatGeo',
-                                                             self.user_data.get('region', 'default')))
+        user_geo = self.user_data.get('rhatGeo', self.user_data.get('region'))
 
-        # I have to quote and unquote when we have values and using default values when we don't have
-        self.user_data = utils.parse_dict_null_value(self.user_data)
-        self.manager_data = utils.parse_dict_null_value(self.manager_data)
-        self.user_data['user_id'] = int(self.user_data['user_id'].replace("'", ''))
+        self.user_data = self.user_data
+        self.manager_data = self.manager_data
 
         # if students exists, update few information in the database based in RH LDAP or IPA
         if self.user_data['user_id'] >= 1:
             # TODO: Student exists, update??
             user_title = self.user_data.get('title')
-            user_manager = self.manager_data.get('cn', 'default')
-            user_manager_mail = self.manager_data.get('mail', 'default')
+            user_manager = self.manager_data.get('cn')
+            user_manager_mail = self.manager_data.get('mail')
+
+            positional_args = [user_geo, self.user_data.get('partner'), self.user_data.get('cost_center'),
+                               user_manager, user_manager_mail, user_title, self.user_data.get('user_id')]
             query = f"UPDATE students SET \n" \
-                    f"  geo = {user_geo}, \n" \
-                    f"  partner = {self.user_data.get('partner')}, \n" \
-                    f"  cost_center = {self.user_data.get('cost_center')}, \n" \
-                    f"  manager = {user_manager}, \n" \
-                    f"  manager_email = {user_manager_mail}, \n" \
-                    f"  title = {user_title} \n" \
-                    f"WHERE id = {self.user_data['user_id']} \n" \
+                    f"  geo = %s, \n" \
+                    f"  partner = %s, \n" \
+                    f"  cost_center = %s, \n" \
+                    f"  manager = %s, \n" \
+                    f"  manager_email = %s, \n" \
+                    f"  title = %s \n" \
+                    f"WHERE id = %s \n" \
                     f"RETURNING id;"
 
             if self.debug:
                 print(f"Querying Updating User:\n{query}")
-
-            cur = utils.execute_query(query, autocommit=True)
+            try:
+                cur = utils.execute_query(query, positional_args=positional_args, autocommit=True)
+            except Exception:
+                self.logger.error("Error updating student", exec_info=True)
 
         elif self.user_data['user_id'] == -1:
+            positional_args = [company_id, self.user_data.get('uid'), self.user_mail, user_full_name, user_geo,
+                               self.user_data.get('partner'),  self.user_data.get('cost_center'),
+                               self.user_data.get('kerberos_id'), self.manager_data.get('cn'),
+                               self.manager_data.get('mail'), self.user_data.get('title'), user_first_name,
+                               user_last_name, self.user_data.get('check_headcount')]
             query = f"INSERT INTO students ( \n" \
                     f"  company_id, \n" \
                     f"  username, \n" \
@@ -283,27 +310,27 @@ class Users(GPTELdap):
                     f"  last_name, \n" \
                     f"  check_headcount \n) \n" \
                     f"VALUES ( \n" \
-                    f"  {company_id}, \n" \
-                    f"  {self.user_data['uid']}, \n" \
-                    f"  '{self.user_mail}', \n" \
-                    f"  '{user_full_name}', \n" \
-                    f"  {user_geo}, \n" \
-                    f"  {self.user_data.get('partner')}, \n" \
-                    f"  {self.user_data.get('cost_center')}, \n" \
-                    f"  NOW(), \n" \
-                    f"  {self.user_data.get('kerberos_id')}, \n" \
-                    f"  {self.manager_data.get('cn', 'default')}, \n" \
-                    f"  {self.manager_data.get('mail', 'default')}, \n" \
-                    f"  {self.user_data.get('title')}, \n" \
-                    f"  '{user_first_name}', \n" \
-                    f"  '{user_last_name}', \n" \
-                    f"  {self.user_data.get('check_headcount')} \n" \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  NOW(), " \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s " \
                     f") RETURNING id;"
 
             if self.debug:
                 print(f"Query Insert: \n{query}")
 
-            cur = utils.execute_query(query, autocommit=True)
+            cur = utils.execute_query(query, positional_args=positional_args, autocommit=True)
             if cur['rowcount'] >= 1:
                 query_result = cur['query_result'][0]
                 self.user_data['user_id'] = query_result['id']

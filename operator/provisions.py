@@ -13,9 +13,10 @@ class Provisions(object):
         self.provision_guid = self.prov_data.get('guid', self.prov_data.get('babylon_guid'))
 
     def check_provision_exists(self):
+        positional_args = [str(self.provision_uuid)]
         query = f"SELECT uuid from provisions \n" \
-                f"WHERE uuid = '{self.provision_uuid}'"
-        result = utils.execute_query(query)
+                f"WHERE uuid = %s"
+        result = utils.execute_query(query, positional_args=positional_args, autocommit=True)
         if result['rowcount'] >= 1:
             query_result = result['query_result'][0]
             return query_result
@@ -23,12 +24,13 @@ class Provisions(object):
             return -1
 
     def populate_purpose(self, purpose_name):
-        query = f"SELECT id FROM purpose WHERE purpose = '{purpose_name}' LIMIT 1;"
+        positional_args = [str(purpose_name)]
+        query = f"SELECT id FROM purpose WHERE purpose = %s LIMIT 1;"
         if self.debug:
             print(f"Searching purpose: {query}")
             self.logger.debug(f"Searching purpose: {query}")
 
-        result = utils.execute_query(query)
+        result = utils.execute_query(query, positional_args=positional_args, autocommit=True)
 
         if result['rowcount'] >= 1:
             query_result = result['query_result'][0]
@@ -42,14 +44,17 @@ class Provisions(object):
                 category = 'Development'
             elif 'Customer Activity' in purpose_name:
                 category = 'Customer Activity'
+
+            positional_args = [purpose_name, category]
             query_insert = f"INSERT INTO purpose (purpose, category) \n" \
-                           f"VALUES ('{purpose_name}', '{category}') \n" \
+                           f"VALUES (%s, %s) \n" \
                            f"RETURNING id;"
+
             if self.debug:
                 print(f"New purpose: {query_insert}")
                 self.logger.debug(f"New purpose: {query_insert}")
 
-            result = utils.execute_query(query_insert, autocommit=True)
+            result = utils.execute_query(query_insert, positional_args=positional_args, autocommit=True)
 
             if result['rowcount'] >= 1:
                 query_result = result['query_result'][0]
@@ -65,24 +70,31 @@ class Provisions(object):
         user_manager_id = user_db_info.get('manager_id')
         user_manager_chargeback_id = user_db_info.get('manager_chargeback_id')
         user_cost_center = user_db_info.get('cost_center', '441')
+        provision_guid = self.prov_data.get('guid')
+        current_state = self.prov_data.get('current_state')
+        user_region = self.user_data.get('region')
+
+        positional_args = [user_db_id, provision_guid, user_cost_center, user_region,
+                           user_manager_id, user_manager_chargeback_id, current_state,
+                           self.provision_uuid]
 
         query = f"UPDATE provisions SET \n" \
-                f"  student_id = {user_db_id}, \n" \
-                f"  guid = {utils.parse_null_value(self.prov_data.get('guid'))}, \n" \
-                f"  cost_center = {user_cost_center}, \n" \
-                f"  student_geo = '{self.user_data.get('region')}', \n" \
-                f"  manager_id = {user_manager_id}, \n" \
-                f"  manager_chargeback_id = {user_manager_chargeback_id}, \n" \
+                f"  student_id = %s, \n" \
+                f"  guid = %s, \n" \
+                f"  cost_center = %s, \n" \
+                f"  student_geo = %s, \n" \
+                f"  manager_id = %s, \n" \
+                f"  manager_chargeback_id = %s, \n" \
                 f"  modified_at = timezone('UTC', NOW()), \n" \
-                f"  last_state = '{self.prov_data.get('current_state')}'" \
+                f"  last_state = %s" \
                 f"WHERE \n" \
-                f"  uuid = '{self.provision_uuid}' \n" \
+                f"  uuid = %s \n" \
                 f"RETURNING uuid;"
 
         if self.debug:
             print(f"Query: {query}")
 
-        cur = utils.execute_query(query, autocommit=True)
+        cur = utils.execute_query(query, positional_args=positional_args, autocommit=True)
 
     def populate_provisions(self):
 
@@ -105,7 +117,7 @@ class Provisions(object):
         purpose_id = purpose_id.get('id')
 
         user_db_info = self.prov_data.get('user_db', {})
-        user_db_id = utils.parse_null_value(user_db_info.get('user_id', 'default'))
+        user_db_id = user_db_info.get('user_id')
         user_manager_id = user_db_info.get('manager_id')
         user_manager_chargeback_id  = user_db_info.get('manager_chargeback_id')
         user_cost_center = user_db_info.get('cost_center')
@@ -122,7 +134,43 @@ class Provisions(object):
         # TODO: Fix cloud ec2 to AWS and osp to openstack
         cloud = self.prov_data.get('cloud', 'unknown')
 
-        provisioned_at = datetime.utcnow()
+        provisioned_at = self.prov_data.get('provisioned_at', datetime.utcnow())
+
+        positional_args = [
+            provisioned_at,
+            user_db_id,
+            catalog_id,
+            self.prov_data.get('workshop_users'),
+            self.prov_data.get('workload'),
+            self.prov_data.get('servicetype', 'babylon'),
+            self.prov_data.get('guid'),
+            self.provision_uuid,
+            self.prov_data.get('opportunity'),
+            self.prov_data.get('account', 'tests'),
+            self.prov_data.get('sandbox_name'),
+            provision_results,
+            self.prov_data.get('datasource', 'BABYLON'),
+            self.prov_data.get('environment', 'DEV').upper(),
+            self.prov_data.get('provisiontime', 0),
+            self.prov_data.get('cloud_region', 'default'),
+            self.prov_data.get('babylon_guid', 'NULL'),
+            purpose,
+            cloud,
+            self.prov_data.get('stack_retries', 1),
+            purpose_id,
+            self.prov_data.get('tshirt_size'),
+            user_cost_center,
+            self.user_data.get('region'),
+            user_manager_id,
+            self.prov_data.get('class_name', 'NULL'),
+            self.prov_data.get('chargeback_method'),
+            user_manager_chargeback_id,
+            self.prov_data.get('tower_job_id'),
+            self.prov_data.get('anarchy_governor'),
+            self.prov_data.get('anarchy_subject_name'),
+            current_state
+            ]
+
         query = f"INSERT INTO provisions (\n" \
                 f"  provisioned_at, \n" \
                 f"  student_id, \n" \
@@ -159,45 +207,44 @@ class Provisions(object):
                 f"  last_state \n" \
                 f") \n" \
                 f"VALUES ( \n" \
-                f"  {utils.parse_null_value(self.prov_data.get('provisioned_at', provisioned_at))}, \n" \
-                f"  {user_db_id}, \n" \
-                f"  {catalog_id}, \n" \
-                f"  {self.prov_data.get('workshop_users', 'default')}, \n" \
-                f"  {self.prov_data.get('workload', 'default')}, \n" \
-                f"  '{self.prov_data.get('servicetype', 'babylon')}', \n" \
-                f"  {utils.parse_null_value(self.prov_data.get('guid'))}, \n" \
-                f"  '{self.provision_uuid}', \n" \
-                f"  {self.prov_data.get('opportunity', 'default')}, \n" \
-                f"  '{self.prov_data.get('account', 'tests')}', \n" \
-                f"  {utils.parse_null_value(self.prov_data.get('sandbox_name', 'default'))}, \n" \
-                f"  '{provision_results}', \n" \
-                f"  '{self.prov_data.get('datasource', 'BABYLON')}', \n" \
-                f"  '{self.prov_data.get('environment', 'DEV').upper()}', \n" \
-                f"  {self.prov_data.get('provisiontime', 0)}, \n" \
-                f"  {utils.parse_null_value(self.prov_data.get('cloud_region', 'default'))}, \n" \
-                f"  '{self.prov_data.get('babylon_guid', utils.parse_null_value('NULL'))}', \n" \
-                f"  '{purpose}', \n" \
-                f"  '{cloud}', \n" \
-                f"  {self.prov_data.get('stack_retries', 1)}, \n" \
-                f"  {purpose_id}, \n" \
-                f"  {self.prov_data.get('tshirt_size', 'default')}, \n" \
-                f"  {user_cost_center}, \n" \
-                f"  {utils.parse_null_value(self.user_data.get('region', 'default'))}, \n" \
-                f"  {user_manager_id}, \n" \
-                f"  '{self.prov_data.get('class_name', 'NULL')}', \n" \
-                f"  {self.prov_data.get('chargeback_method', utils.parse_null_value('NULL'))}, \n" \
-                f"  {user_manager_chargeback_id}, \n" \
-                f"  {utils.parse_null_value(self.prov_data.get('tower_job_id'))}, \n" \
-                f"  {utils.parse_null_value(self.prov_data.get('anarchy_governor'))}, \n" \
-                f"  {utils.parse_null_value(self.prov_data.get('anarchy_subject_name'))}, \n" \
-                f"  timezone('UTC', NOW())," \
-                f"  '{current_state}' \n" \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s, " \
+                f"  %s " \
                 f") RETURNING uuid;"
 
         if self.debug:
             print(f"Executing Query insert provisions: {query}")
 
-        cur = utils.execute_query(query, autocommit=True)
+        cur = utils.execute_query(query, positional_args=positional_args, autocommit=True)
 
         if cur['rowcount'] >= 1:
             query_result = cur['query_result'][0]

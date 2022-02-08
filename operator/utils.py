@@ -80,7 +80,7 @@ def get_conn_params(secret_name='gpte-db-secrets'):
     return kw
 
 
-def execute_query(query, positional_args=None, autocommit=False):
+def execute_query(query, positional_args=None, autocommit=True):
     global db_connection
     query_list = []
     if positional_args:
@@ -304,8 +304,9 @@ def parse_ldap_result(result_data, capitalize=True):
 
 
 def check_exists(table_name, identifier, column='id'):
-    query = f"SELECT {column} FROM {table_name} WHERE {column} = '{identifier}'"
-    results = execute_query(query)
+    positional_args = [identifier]
+    query = f"SELECT {column} FROM {table_name} WHERE {column} = %s"
+    results = execute_query(query, positional_args=positional_args, autocommit=True)
     if results['rowcount'] >= 1:
         return True
     else:
@@ -313,14 +314,15 @@ def check_exists(table_name, identifier, column='id'):
 
 
 def last_lifecycle(provision_uuid):
+    positional_args = [provision_uuid]
     query = f"SELECT MAX(logged_at), state \n" \
             f"FROM lifecycle_log ll \n" \
-            f"WHERE provision_uuid = '{provision_uuid}' \n" \
+            f"WHERE provision_uuid = %s \n" \
             f"GROUP BY state \n" \
             f"ORDER BY 1 DESC \n" \
             f"LIMIT 1;"
 
-    result = execute_query(query)
+    result = execute_query(query, positional_args=positional_args, autocommit=True)
 
     if result['rowcount'] >= 1:
         query_result = result['query_result'][0]
@@ -343,7 +345,7 @@ def provision_lifecycle(provision_uuid, current_state, username):
             f"  modified_at = timezone('UTC', NOW())" \
             f"WHERE uuid = %s RETURNING uuid;"
 
-    cur = execute_query(query, autocommit=True, positional_args=positional_args)
+    cur = execute_query(query, positional_args=positional_args, autocommit=True)
 
     if username is None:
         username = 'gpte-user'
@@ -357,20 +359,21 @@ def provision_lifecycle(provision_uuid, current_state, username):
     query = f"INSERT INTO lifecycle_log (provision_uuid, state, executor) \n" \
             f"VALUES ( %s, %s, %s) RETURNING id;"
 
-    cur = execute_query(query, autocommit=True, positional_args=positional_args)
+    cur = execute_query(query, positional_args=positional_args,  autocommit=True)
 
 
 def update_provision_result(provision_uuid, result='success'):
     positional_args = [result, provision_uuid]
     query = f"UPDATE provisions SET provision_result = %s WHERE uuid = %s RETURNING uuid;"
 
-    execute_query(query, autocommit=True, positional_args=positional_args)
+    execute_query(query, positional_args=positional_args, autocommit=True)
 
 
 def check_provision_exists(provision_uuid, babylon_guid):
+    positional_args = [provision_uuid, babylon_guid]
     query = f"SELECT uuid from provisions \n" \
-            f"WHERE uuid = '{provision_uuid}' or babylon_guid = '{babylon_guid}'"
-    result = execute_query(query)
+            f"WHERE uuid = %s or babylon_guid = %s"
+    result = execute_query(query, positional_args=positional_args, autocommit=True)
     if result['rowcount'] >= 1:
         query_result = result['query_result'][0]
         return query_result
@@ -396,9 +399,9 @@ def save_resource_claim_data(resource_claim_uuid, as_resource_claim_name, resour
             f"  provision_uuid = %s AND \n" \
             f"  resource_claim_name = %s AND \n" \
             f"  resource_claim_namespace = %s"
-    positional_args = [resource_claim_uuid, as_resource_claim_name, resource_claim_namespace]
 
-    results = execute_query(query=query, positional_args=positional_args)
+    positional_args = [resource_claim_uuid, as_resource_claim_name, resource_claim_namespace]
+    results = execute_query(query=query, positional_args=positional_args, autocommit=True)
 
     query_result = results['query_result'][0]
 
@@ -415,7 +418,7 @@ def save_resource_claim_data(resource_claim_uuid, as_resource_claim_name, resour
 
         execute_query(query=query, positional_args=positional_args, autocommit=True)
 
-    elif results['rowcount'] > 1:
+    elif results['rowcount'] >= 1:
         positional_args = [as_resource_claim_name, resource_claim_namespace,
                            json.dumps(resource_claim_log), resource_claim_uuid]
         query = 'UPDATE resource_claim_log SET' \
@@ -424,6 +427,7 @@ def save_resource_claim_data(resource_claim_uuid, as_resource_claim_name, resour
                 '  resource_claim_json = %s \n' \
                 'WHERE  provision_uuid = %s \n' \
                 'RETURNING provision_uuid'
+
         execute_query(query=query, positional_args=positional_args, autocommit=True)
 
 
@@ -439,9 +443,9 @@ def save_provision_vars(resource_claim_uuid, as_resource_claim_name, resource_cl
             f"  provision_uuid = %s AND \n" \
             f"  resource_claim_name = %s AND \n" \
             f"  resource_claim_namespace = %s"
-    positional_args = [resource_claim_uuid, as_resource_claim_name, resource_claim_namespace]
 
-    results = execute_query(query=query, positional_args=positional_args)
+    positional_args = [resource_claim_uuid, as_resource_claim_name, resource_claim_namespace]
+    results = execute_query(query=query, positional_args=positional_args, autocommit=True)
 
     query_result = results['query_result'][0]
 

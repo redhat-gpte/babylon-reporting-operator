@@ -1,4 +1,4 @@
-from simple_salesforce import Salesforce
+from simple_salesforce import Salesforce, format_soql
 import requests
 import os
 import utils
@@ -39,13 +39,13 @@ class SalesForce(object):
         try:
             results = self.sf_conn.query(query)
             return results
-        except Exception as e:
-            self.logger.error(f"Error executing SalesForce {query} - {e}")
+        except Exception:
+            self.logger.error("Error executing sales force query", stack_info=True)
             return -1
 
     def get_sf_owner(self, owner_id):
         owner_data = {}
-        query = f"SELECT Name, Email, Title FROM User WHERE Id = '{owner_id}'"
+        query = format_soql("SELECT Name, Email, Title FROM User WHERE Id = {}", str(owner_id))
         owner_info = self.execute_sf_query(query)
         if owner_info == -1:
             owner_data.update({'OwnerName': None})
@@ -60,7 +60,7 @@ class SalesForce(object):
 
     def get_sf_account(self, account_id):
         acc_data = {}
-        query = f"SELECT Name FROM Account WHERE Id = '{account_id}'"
+        query = format_soql("SELECT Name FROM Account WHERE Id = {}", str(account_id))
         acc_info = self.execute_sf_query(query)
         if acc_info == -1:
             acc_data.update({'AccountName': None})
@@ -71,8 +71,8 @@ class SalesForce(object):
 
     def get_sf_opportunity(self, opp_id):
         opp_data = {}
-        opp_query = f"SELECT Id, Name, AccountId, OwnerId, Type, IsClosed, CloseDate, StageName, Amount, " \
-                    f"ExpectedRevenue, OpportunityNumber__c FROM Opportunity WHERE Id =  {opp_id}"
+        opp_query = format_soql("SELECT Id, Name, AccountId, OwnerId, Type, IsClosed, CloseDate, StageName, Amount, "
+                                "ExpectedRevenue, OpportunityNumber__c FROM Opportunity WHERE Id = {}", str(opp_id))
         # Trying to query by a opportunity ID, but we don't know if exists, if raise SalesforceMalformedRequest,
         # the opportunity number is invalid
         if self.debug:
@@ -95,9 +95,9 @@ class SalesForce(object):
 
     def get_sf_opportunity_by_number(self, opp_id):
         opp_data = {}
-        opp_query = f"SELECT Id, Name, AccountId, OwnerId, Type, IsClosed, CloseDate, StageName, Amount, " \
-                    f"ExpectedRevenue, OpportunityNumber__c FROM Opportunity " \
-                    f"WHERE OpportunityNumber__c =  {opp_id}"
+        opp_query = format_soql("SELECT Id, Name, AccountId, OwnerId, Type, IsClosed, CloseDate, StageName, Amount, "
+                                "ExpectedRevenue, OpportunityNumber__c FROM Opportunity "
+                                "WHERE OpportunityNumber__c = {}", str(opp_id))
         # Trying to query by a opportunity number, but we don't know if exists, if raise SalesforceMalformedRequest,
         # the opportunity number is invalid
         if self.debug:
@@ -125,12 +125,13 @@ class Opportunities(SalesForce):
         super().__init__(logger)
         self.logger = logger
         self.prov_data = prov_data
-        self.opp_id = utils.parse_null_value(self.prov_data.get('opportunity', None))
+        self.opp_id = self.prov_data.get('opportunity', None)
 
     def check_opportunity_exists(self):
+        positional_args = [self.opp_id, self.opp_id]
         query = f"SELECT * FROM opportunities \n" \
-                f"WHERE opportunity_id = {self.opp_id} or number = {self.opp_id};"
-        result = utils.execute_query(query)
+                f"WHERE opportunity_id = %s or number = %s;"
+        result = utils.execute_query(query, positional_args=positional_args, autocommit=True)
         if result['rowcount'] >= 1:
             query_result = result['query_result'][0]
             return query_result
@@ -160,21 +161,21 @@ class Opportunities(SalesForce):
             self.logger.warning(f"Can't find opportunity {self.opp_id} by ID")
             return False
 
-        account_id = utils.parse_null_value(opp_info['AccountId'])
-        account_name = utils.parse_null_value(opp_info['AccountName'].replace("'", " "))
-        opp_amount = utils.parse_null_value(opp_info['Amount'])
-        closed_date = utils.parse_null_value(opp_info['CloseDate'])
-        revenue = utils.parse_null_value(opp_info['ExpectedRevenue'])
-        opp_closed = utils.parse_null_value(opp_info['IsClosed'])
-        opp_name = utils.parse_null_value(opp_info['Name'].replace("'", " "))
-        owner_email = utils.parse_null_value(opp_info['OwnerEmail'])
-        owner_id = utils.parse_null_value(opp_info['OwnerId'])
-        owner_name = utils.parse_null_value(opp_info['OwnerName'])
-        owner_title = utils.parse_null_value(opp_info['OwnerTitle'])
-        stage = utils.parse_null_value(opp_info['StageName'])
-        opp_type = utils.parse_null_value(opp_info['Type'])
-        opportunity_id = utils.parse_null_value(opp_info['Id'])
-        opp_number = utils.parse_null_value(opp_info['OpportunityNumber__c'])
+        account_id = opp_info['AccountId']
+        account_name = opp_info['AccountName'].replace("'", " ")
+        opp_amount = opp_info['Amount']
+        closed_date = opp_info['CloseDate']
+        revenue = opp_info['ExpectedRevenue']
+        opp_closed = opp_info['IsClosed']
+        opp_name = opp_info['Name']
+        owner_email = opp_info['OwnerEmail']
+        owner_id = opp_info['OwnerId']
+        owner_name = opp_info['OwnerName']
+        owner_title = opp_info['OwnerTitle']
+        stage = opp_info['StageName']
+        opp_type = opp_info['Type']
+        opportunity_id = opp_info['Id']
+        opp_number = opp_info['OpportunityNumber__c']
 
         opp_results = self.check_opportunity_exists()
 
@@ -185,6 +186,9 @@ class Opportunities(SalesForce):
 
         if opp_db_number == -1:
             self.logger.info(f"Populate opportunity {self.opp_id}")
+            positional_args = [account_id, account_name, opp_amount, closed_date, revenue,
+                               opportunity_id, opp_closed, opp_name, owner_email, owner_id,
+                               owner_name, owner_title, stage, opp_type, opp_number]
             query = f"INSERT INTO opportunities ( \n" \
                     f"  account_id, \n" \
                     f"  account_name, \n" \
@@ -203,51 +207,56 @@ class Opportunities(SalesForce):
                     f"  number \n" \
                     f") \n" \
                     f"VALUES ( \n" \
-                    f"  {account_id}, \n" \
-                    f"  {account_name}, \n" \
-                    f"  {opp_amount}, \n" \
-                    f"  {closed_date}, \n" \
-                    f"  {revenue}, \n" \
-                    f"  {opportunity_id}, \n" \
-                    f"  {opp_closed}, \n" \
-                    f"  {opp_name}, \n" \
-                    f"  {owner_email}, \n" \
-                    f"  {owner_id}, \n" \
-                    f"  {owner_name}, \n" \
-                    f"  {owner_title}, \n" \
-                    f"  {stage}, \n" \
-                    f"  {opp_type}, \n" \
-                    f"  {opp_number} \n" \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s, " \
+                    f"  %s, " \
                     f") \n"
         else:
             self.logger.info(f"Updating opportunity {self.opp_id}")
+            positional_args = [opportunity_id, account_id, account_name, opp_amount, closed_date,
+                               revenue, opp_closed, opp_name, owner_email, owner_id, owner_name,
+                               owner_title, stage, opp_type, opp_number]
             query = f"UPDATE opportunities SET \n" \
-                    f"  opportunity_id = {opportunity_id}, \n" \
-                    f"  account_id = {account_id}, \n" \
-                    f"  account_name = {account_name}, \n" \
-                    f"  amount = {opp_amount}, \n" \
-                    f"  closed_at = {closed_date}, \n" \
-                    f"  expected_revenue = {revenue}, \n" \
-                    f"  is_closed = {opp_closed}, \n" \
-                    f"  opportunity_name = {opp_name}, \n" \
-                    f"  owner_email = {owner_email}, \n" \
-                    f"  owner_id = {owner_id}, \n" \
-                    f"  owner_name = {owner_name}, \n" \
-                    f"  owner_title = {owner_title}, \n" \
-                    f"  stage = {stage}, \n" \
-                    f"  type = {opp_type}, \n" \
-                    f"  number = {opp_number}, \n" \
+                    f"  opportunity_id = %s, \n" \
+                    f"  account_id = %s, \n" \
+                    f"  account_name = %s, \n" \
+                    f"  amount = %s, \n" \
+                    f"  closed_at = %s, \n" \
+                    f"  expected_revenue = %s, \n" \
+                    f"  is_closed = %s, \n" \
+                    f"  opportunity_name = %s, \n" \
+                    f"  owner_email = %s, \n" \
+                    f"  owner_id = %s, \n" \
+                    f"  owner_name = %s, \n" \
+                    f"  owner_title = %s, \n" \
+                    f"  stage = %s, \n" \
+                    f"  type = %s, \n" \
+                    f"  number = %s, \n" \
                     f"  update_at = NOW() \n"
             if opp_by_number:
                 query += f"WHERE number = {opp_number} \n"
+                positional_args.append(opp_number)
             else:
                 query += f"WHERE opportunity_id = {self.opp_id} \n"
+                positional_args.append(opp_number)
 
         query += "RETURNING id;"
         if self.debug:
             print(f"Query Opportunity: \n{query}")
 
-        cur = utils.execute_query(query, autocommit=True)
+        cur = utils.execute_query(query, positional_args=positional_args, autocommit=True)
 
         if cur['rowcount'] >= 1:
             query_result = cur['query_result'][0]

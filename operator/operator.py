@@ -283,12 +283,16 @@ def anarchysubject_event(event, logger, **_):
 
         populate_provision(logger, anarchy_subject)
 
+        positional_args = [resource_uuid]
         query = f"UPDATE provisions SET retired_at = timezone('utc', NOW()) \n" \
-                f"WHERE uuid = '{resource_uuid}' and retired_at ISNULL RETURNING uuid;"
-        utils.execute_query(query, autocommit=True)
-        utils.provision_lifecycle(resource_uuid, 'destroy-completed', username)
-        return
+                f"WHERE uuid = %s and retired_at ISNULL RETURNING uuid;"
+        try:
+            utils.execute_query(query, positional_args=positional_args, autocommit=True)
+            utils.provision_lifecycle(resource_uuid, 'destroy-completed', username)
+        except Exception:
+            logger.error(f"Error update retirement date for {resource_uuid}", stack_info=True)
 
+        return
 
     if current_state in resource_states:
         resource_states[current_state](logger, anarchy_subject)
