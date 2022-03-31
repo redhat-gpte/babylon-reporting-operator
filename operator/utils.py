@@ -175,8 +175,7 @@ def execute_query(query, positional_args=None, autocommit=False):
 
 
         except Exception as e:
-            if not autocommit:
-                db_pool_conn.rollback()
+            db_pool_conn.rollback()
 
             cursor.close()
             db_connection.putconn(db_pool_conn)

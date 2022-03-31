@@ -534,7 +534,7 @@ def prepare(anarchy_subject, logger):
     sandbox_account = anarchy_subject_job_vars.get('sandbox_account', provision_data.get('ibm_sandbox_account'))
     sandbox_name = anarchy_subject_job_vars.get('sandbox_name', provision_data.get('ibm_sandbox_name'))
 
-    workshop_users = provision_job_vars.get('num_users', 1)
+    workshop_users = provision_job_vars.get('user_count', provision_job_vars.get('num_users', 1))
 
     datasource = provision_job_vars.get('platform', 'BABYLON').upper()
     if datasource == 'LABS':
