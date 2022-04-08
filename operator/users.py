@@ -2,6 +2,7 @@ import json
 import utils
 from corp_ldap import GPTELdap
 from manager_chargeback import ManagerChargeback
+from datetime import datetime, timezone
 
 
 class Users(GPTELdap):
@@ -13,38 +14,7 @@ class Users(GPTELdap):
         self.user_data = self.prov_data.get('user', {})
         self.manager_data = self.user_data.get('manager', {})
         self.user_mail = self.user_data.get('mail', '').lower()
-        self.manager_mail = 'default'
-
-    def check_user_exists(self):
-        """
-        Check if students email exists in the database and returns ID and check_headcount.
-        It's ordering by created_at to use the first user created.
-        :return: a dictionary
-        dict(
-            id,
-            check_headcount,
-        )
-        """
-        query = f"SELECT id, check_headcount FROM students " \
-                f"WHERE email = '{self.user_mail}' ORDER BY created_at"
-        result = utils.execute_query(query)
-        if result['rowcount'] >= 1:
-            query_result = result['query_result'][0]
-            return query_result
-        else:
-            return -1
-
-    def get_company_id(self):
-        """
-        This method is just for compatibility with costs reports
-        :return: company_id
-        """
-        if '@' in self.user_mail and '@redhat.com' in self.user_mail:
-            return 16736
-        if '@' in self.user_mail and 'ibm.com' in self.user_mail:
-            return 13716
-        else:
-            return 10000
+        self.manager_mail = None
 
     def get_manager_chargeback(self):
         """
@@ -60,9 +30,13 @@ class Users(GPTELdap):
         Check if manager already exists in the managers table
         :return: manager_id or -1 if the manager doesn't exists yet
         """
+        positional_args = [self.manager_mail]
+
         query = f"SELECT id FROM manager " \
-                f"WHERE email = {utils.parse_null_value(self.manager_mail)}"
-        result = utils.execute_query(query)
+                f"WHERE email = %s"
+
+        result = utils.execute_query(query, positional_args=positional_args, autocommit=True)
+
         if result['rowcount'] >= 1:
             query_result = result['query_result'][0]
             return query_result
@@ -76,21 +50,29 @@ class Users(GPTELdap):
         """
         manager_id = self.check_manager_exists()
         # If manager doesn't exists insert into
-        if manager_id == -1:
-            query = f"INSERT INTO manager (name, email, kerberos_id) \n" \
-                    f"VALUES ( \n" \
-                    f"  '{self.manager_data['cn']}', \n" \
-                    f"  '{self.manager_data['mail']}', \n" \
-                    f"  '{self.manager_data['uid']}') RETURNING id;"
-            result = utils.execute_query(query, autocommit=True)
-            if result['rowcount'] >= 1:
-                manager_id = result['query_result'][0]
-            else:
-                return -1
+
+        insert_fields = {
+            'name': self.manager_data.get('cn'),
+            'email': self.manager_data.get('mail'),
+            'kerberos_id': self.manager_data.get('uid')
+
+        }
+
+        update_fields = {
+            'name': self.manager_data.get('cn'),
+            'email': self.manager_data.get('mail'),
+            'kerberos_id': self.manager_data.get('uid')
+        }
+
+        query, positional_args = utils.create_sql_statement(insert_fields, update_fields, 'manager',
+                                                            'manager_unique_email', 'id' )
+
+        result = utils.execute_query(query, positional_args=positional_args, autocommit=True)
+
+        if result['rowcount'] >= 1:
+            return result['query_result'][0]
         else:
-            # TODO: Update Manager????
-            pass
-        return manager_id
+            return None
 
     def search_internal_user(self):
         """
@@ -120,7 +102,7 @@ class Users(GPTELdap):
 
         if isinstance(chargeback_manager_mail, dict) or \
                 chargeback_manager_mail == 'gpte@redhat.com':
-            manager_chargeback_id = 'default'
+            manager_chargeback_id = None
         else:
             manager_chargeback_id = manager_list[chargeback_manager_mail]
 
@@ -145,18 +127,18 @@ class Users(GPTELdap):
             user_data = self.ldap_search_user(n_email)
 
         self.manager_data = user_data.get('manager', {})
-        self.manager_mail = self.manager_data.get('mail', 'default')
-        manager_name = self.manager_data.get('cn', 'default').replace("'", '')
-        manager_kerberos_id = self.manager_data.get('uid', 'default')
-        user_kerberos_id = user_data.get('uid', 'default')
-        user_title = user_data.get('title', 'default')
-        user_cost_center = user_data.get('rhatCostCenter', 'default')
-        user_geo = user_data.get('rhatGeo', 'default')
+        self.manager_mail = self.manager_data.get('mail')
+        manager_name = self.manager_data.get('cn')
+        manager_kerberos_id = self.manager_data.get('uid')
+        user_kerberos_id = user_data.get('uid')
+        user_title = user_data.get('title')
+        user_cost_center = user_data.get('rhatCostCenter')
+        user_geo = user_data.get('rhatGeo')
 
-        if self.manager_mail == 'default':
-            manager_id = 'default'
+        if not self.manager_mail:
+            manager_id = None
         else:
-            manager_id = self.populate_manager().get('id', 'default')
+            manager_id = self.populate_manager().get('id')
 
         if self.debug:
             print("search_internal_user: \n"
@@ -206,112 +188,111 @@ class Users(GPTELdap):
               cost_center
             }
         """
-        # TODO: How to get User's geo from IPA
         user_first_name = self.user_data.get('givenName', 'default').capitalize().strip()
         user_last_name = self.user_data.get('sn', 'default').capitalize().strip()
         user_full_name = f"{user_first_name} {user_last_name}"
 
         self.user_data['partner'] = 'partner'
+        gpte_user = 'Only Regular Users'
+
         if '@redhat.com' in self.user_mail:
             self.user_data['partner'] = 'redhat'
             self.search_internal_user()
+            company_id = 16736
+        elif 'poolboy' in self.user_mail:
+            self.user_data['partner'] = 'redhat'
+            self.user_data['cost_center'] = 99999
+            gpte_user = 'Poolboy'
+            company_id = 16736
         elif 'ibm.com' in self.user_mail:
             self.user_data['partner'] = 'IBM'
             self.user_data['cost_center'] = None
             self.user_data['kerberos_id'] = None
             self.manager_data['cn'] = None
             self.manager_data['mail'] = None
+            company_id = 13716
         else:
             self.user_data['kerberos_id'] = None
             self.manager_data['cn'] = None
             self.manager_data['mail'] = None
+            company_id = 10000
 
-        user_results = self.check_user_exists()
-        if isinstance(user_results, dict):
-            self.user_data['user_id'] = user_results.get('id', -1)
-            self.user_data['check_headcount'] = user_results.get('check_headcount', True)
-        else:
-            self.user_data['user_id'] = -1
-            self.user_data['check_headcount'] = True
-
-        company_id = self.get_company_id()
-
-        user_geo = utils.parse_null_value(self.user_data.get('rhatGeo',
-                                                             self.user_data.get('region', 'default')))
+        user_geo = self.user_data.get('rhatGeo', self.user_data.get('region', 'NA'))
 
         # I have to quote and unquote when we have values and using default values when we don't have
-        self.user_data = utils.parse_dict_null_value(self.user_data)
-        self.manager_data = utils.parse_dict_null_value(self.manager_data)
-        self.user_data['user_id'] = int(self.user_data['user_id'].replace("'", ''))
+        # self.user_data = self.user_data
+        self.manager_data = self.manager_data
+        self.user_data['user_id'] = self.user_data.get('user_id')
 
-        # if students exists, update few information in the database based in RH LDAP or IPA
-        if self.user_data['user_id'] >= 1:
-            # TODO: Student exists, update??
-            user_title = self.user_data.get('title')
-            user_manager = self.manager_data.get('cn', 'default')
-            user_manager_mail = self.manager_data.get('mail', 'default')
-            query = f"UPDATE students SET \n" \
-                    f"  geo = {user_geo}, \n" \
-                    f"  partner = {self.user_data.get('partner')}, \n" \
-                    f"  cost_center = {self.user_data.get('cost_center')}, \n" \
-                    f"  manager = {user_manager}, \n" \
-                    f"  manager_email = {user_manager_mail}, \n" \
-                    f"  title = {user_title} \n" \
-                    f"WHERE id = {self.user_data['user_id']} \n" \
-                    f"RETURNING id;"
+        # Only GPTE Exclusions
+        pfe_managers = ['sborenst@redhat.com', 'oczernin@redhat.com',
+                        'nalentor@redhat.com', 'jenkins.sfo01@redhat.com',
+                        'jenkins.sfo01@gmail.com', 'brezhnev@redhat.com'
+                        ]
 
-            if self.debug:
-                print(f"Querying Updating User:\n{query}")
+        if self.manager_mail in pfe_managers or self.user_mail in pfe_managers:
+            gpte_user = 'Only GPTE Exclusions'
 
-            cur = utils.execute_query(query, autocommit=True)
+        print(f"PFE USER: {gpte_user}")
+        print(f"PFE Manager Email: {self.manager_mail}")
+        print(f"PFE USER Manager: '{self.manager_data.get('mail', '')}'")
 
-        elif self.user_data['user_id'] == -1:
-            query = f"INSERT INTO students ( \n" \
-                    f"  company_id, \n" \
-                    f"  username, \n" \
-                    f"  email, \n" \
-                    f"  full_name, \n" \
-                    f"  geo, \n" \
-                    f"  partner, \n" \
-                    f"  cost_center, \n" \
-                    f"  created_at, \n" \
-                    f"  kerberos_id, \n" \
-                    f"  manager, \n" \
-                    f"  manager_email, \n" \
-                    f"  title, \n" \
-                    f"  first_name, \n" \
-                    f"  last_name, \n" \
-                    f"  check_headcount \n) \n" \
-                    f"VALUES ( \n" \
-                    f"  {company_id}, \n" \
-                    f"  {self.user_data['uid']}, \n" \
-                    f"  '{self.user_mail}', \n" \
-                    f"  '{user_full_name}', \n" \
-                    f"  {user_geo}, \n" \
-                    f"  {self.user_data.get('partner')}, \n" \
-                    f"  {self.user_data.get('cost_center')}, \n" \
-                    f"  NOW(), \n" \
-                    f"  {self.user_data.get('kerberos_id')}, \n" \
-                    f"  {self.manager_data.get('cn', 'default')}, \n" \
-                    f"  {self.manager_data.get('mail', 'default')}, \n" \
-                    f"  {self.user_data.get('title')}, \n" \
-                    f"  '{user_first_name}', \n" \
-                    f"  '{user_last_name}', \n" \
-                    f"  {self.user_data.get('check_headcount')} \n" \
-                    f") RETURNING id;"
+        insert_fields = {
+            'company_id': company_id,
+            'username': self.user_data.get('uid'),
+            'email': self.user_mail,
+            'full_name': user_full_name,
+            'geo': user_geo,
+            'partner': self.user_data.get('partner'),
+            'cost_center': self.user_data.get('cost_center'),
+            'created_at': datetime.now(timezone.utc),
+            'kerberos_id': self.user_data.get('kerberos_id'),
+            'manager': self.manager_data.get('cn'),
+            'manager_email': self.manager_data.get('mail'),
+            'title': self.user_data.get('title'),
+            'first_name': user_first_name,
+            'last_name': user_last_name,
+            'gpte_user': gpte_user,
+            'check_headcount': self.user_data.get('check_headcount', True)
+        }
 
-            if self.debug:
-                print(f"Query Insert: \n{query}")
+        update_fields = {
+            'company_id': company_id,
+            'username': self.user_data.get('uid'),
+            'email': self.user_mail,
+            'full_name': user_full_name,
+            'geo': user_geo,
+            'partner': self.user_data.get('partner'),
+            'cost_center': self.user_data.get('cost_center'),
+            'kerberos_id': self.user_data.get('kerberos_id'),
+            'manager': self.manager_data.get('cn'),
+            'manager_email': self.manager_data.get('mail'),
+            'title': self.user_data.get('title'),
+            'first_name': user_first_name,
+            'last_name': user_last_name,
+            'gpte_user': gpte_user,
+            'check_headcount': self.user_data.get('check_headcount', True)
+        }
 
-            cur = utils.execute_query(query, autocommit=True)
-            if cur['rowcount'] >= 1:
-                query_result = cur['query_result'][0]
-                self.user_data['user_id'] = query_result['id']
+        query, positional_args = utils.create_sql_statement(insert_fields=insert_fields,
+                                                            update_fields=update_fields,
+                                                            table_name='students',
+                                                            constraint='students_unique_email',
+                                                            return_field='id,check_headcount')
+
+        if self.debug:
+            print(f"Query Insert: \n{query}", positional_args)
+
+        cur = utils.execute_query(query, positional_args=positional_args, autocommit=True)
+        if cur['rowcount'] >= 1:
+            query_result = cur['query_result'][0]
+            self.user_data['user_id'] = query_result.get('id')
+            self.user_data['check_headcount'] = query_result.get('check_headcount', True)
 
         results = {
             'user_id': self.user_data['user_id'],
             'manager_chargeback_id': self.user_data['manager_chargeback_id'],
-            'manager_id': self.user_data['manager'].get('manager_id', 'default'),
+            'manager_id': self.user_data['manager'].get('manager_id'),
             'cost_center': self.user_data.get('cost_center')
         }
         return results
