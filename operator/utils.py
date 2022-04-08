@@ -1,3 +1,9 @@
+import os
+
+# Set default timezone to UTC
+os.environ['TZ'] = 'UTC'
+os.environ['PGTZ'] = 'UTC'
+
 import kubernetes
 import base64
 import json
@@ -6,13 +12,11 @@ from psycopg2.extras import DictCursor
 from psycopg2 import ProgrammingError as Psycopg2ProgrammingError
 from psycopg2 import pool
 import decimal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import re
 import pytz
+import tzlocal
 from retrying import retry
-
-
-global db_connection
 
 
 def list_to_pg_array(elem):
@@ -56,13 +60,7 @@ def convert_elements_to_pg_arrays(obj):
 def get_conn_params(secret_name='gpte-db-secrets'):
     """Get connection parameters from the passed dictionary.
     Return a dictionary with parameters to connect to PostgreSQL server.
-    Args:
-        module (AnsibleModule) -- object of ansible.module_utils.basic.AnsibleModule class
-        params_dict (dict) -- dictionary with variables
-    Kwargs:
-        warn_db_default (bool) -- warn that the default DB is used (default True)
     """
-    # get secrets and convert it to a dict to connection info
     params_dict = get_secret_data(secret_name)
     params_map = {
         "hostname": "host",
@@ -80,16 +78,49 @@ def get_conn_params(secret_name='gpte-db-secrets'):
     return kw
 
 
+# Wait 2^x * 500 milliseconds between each retry, up to 5 seconds, then 5 seconds afterwards and 3 attempts
+@retry(stop_max_attempt_number=3, wait_exponential_multiplier=500, wait_exponential_max=5000)
+def connect_to_db(fail_on_conn=True):
+
+    db_connection = None
+    conn_params = get_conn_params()
+    try:
+        # TODO: Create parameter to max_connection and min_connection
+        db_connection = pool.ThreadedConnectionPool(2, 4, **conn_params)
+        if db_connection:
+            print("Connection pool created successfully using ThreadedConnectionPool")
+
+    except TypeError as e:
+        if 'sslrootcert' in e.args[0]:
+            print('Postgresql server must be at least '
+                  'version 8.4 to support sslrootcert')
+        if fail_on_conn:
+            print("unable to connect to database: %s" % e)
+        else:
+            print("PostgreSQL server is unavailable: %s" % e)
+            db_connection = None
+    except Exception as e:
+        if fail_on_conn:
+            print("unable to connect to database: %s" % e)
+        else:
+            print("PostgreSQL server is unavailable: %s" % e)
+            db_connection = None
+
+    return db_connection
+
+
 def execute_query(query, positional_args=None, autocommit=False):
-    global db_connection
+
+    db_connection = connect_to_db()
+
     query_list = []
     if positional_args:
         positional_args = convert_elements_to_pg_arrays(positional_args)
 
     query_list.append(query)
 
-    if not db_connection:
-        connect_to_db()
+    if db_connection is None:
+        db_connection = connect_to_db()
 
     # This is a workaround to reconnect to database
     db_pool_conn = db_connection.getconn()
@@ -185,8 +216,12 @@ def execute_query(query, positional_args=None, autocommit=False):
                   "Error: %s, \n"
                   "query list: %s\n"
                   "" % (query, arguments, e, query_list))
+            db_connection.closeall()
+
     if autocommit:
         db_pool_conn.commit()
+    else:
+        db_pool_conn.rollback()
 
     kw = dict(
         changed=changed,
@@ -205,37 +240,11 @@ def execute_query(query, positional_args=None, autocommit=False):
         print(f"ERROR closing connection {e}")
         pass
 
+    # closing database connection.
+    # use closeall() method to close all the active connection if you want to turn of the application
+    db_connection.closeall()
+    del db_connection
     return kw
-
-
-# Wait 2^x * 500 milliseconds between each retry, up to 5 seconds, then 5 seconds afterwards and 3 attempts
-@retry(stop_max_attempt_number=3, wait_exponential_multiplier=500, wait_exponential_max=5000)
-def connect_to_db(fail_on_conn=True):
-    global db_connection
-
-    conn_params = get_conn_params()
-
-    try:
-        # TODO: Create parameter to max_connection and min_connection
-        db_connection = pool.ThreadedConnectionPool(2, 100, **conn_params)
-        if db_connection:
-            print("Connection pool created successfully using ThreadedConnectionPool")
-
-    except TypeError as e:
-        if 'sslrootcert' in e.args[0]:
-            print('Postgresql server must be at least '
-                  'version 8.4 to support sslrootcert')
-        if fail_on_conn:
-            print("unable to connect to database: %s" % e)
-        else:
-            print("PostgreSQL server is unavailable: %s" % e)
-            db_connection = None
-    except Exception as e:
-        if fail_on_conn:
-            print("unable to connect to database: %s" % e)
-        else:
-            print("PostgreSQL server is unavailable: %s" % e)
-            db_connection = None
 
 
 def parse_null_value(value):
@@ -260,7 +269,7 @@ def parse_dict_null_value(dictionary):
 
     return new_dict
 
-
+@retry(stop_max_attempt_number=3, wait_exponential_multiplier=500, wait_exponential_max=5000)
 def get_secret_data(secret_name, secret_namespace=None):
     core_v1_api = kubernetes.client.CoreV1Api()
     if not secret_namespace:
@@ -303,8 +312,10 @@ def parse_ldap_result(result_data, capitalize=True):
 
 
 def check_exists(table_name, identifier, column='id'):
-    query = f"SELECT {column} FROM {table_name} WHERE {column} = '{identifier}'"
-    results = execute_query(query)
+    positional_args = [identifier]
+    query = f"SELECT {column} FROM {table_name} WHERE {column} = %s'"
+    results = execute_query(query, positional_args=positional_args, autocommit=True)
+
     if results['rowcount'] >= 1:
         return True
     else:
@@ -312,14 +323,15 @@ def check_exists(table_name, identifier, column='id'):
 
 
 def last_lifecycle(provision_uuid):
+    positional_args = [provision_uuid]
     query = f"SELECT MAX(logged_at), state \n" \
             f"FROM lifecycle_log ll \n" \
-            f"WHERE provision_uuid = '{provision_uuid}' \n" \
+            f"WHERE provision_uuid = %s \n" \
             f"GROUP BY state \n" \
             f"ORDER BY 1 DESC \n" \
             f"LIMIT 1;"
 
-    result = execute_query(query)
+    result = execute_query(query, positional_args=positional_args, autocommit=True)
 
     if result['rowcount'] >= 1:
         query_result = result['query_result'][0]
@@ -328,7 +340,30 @@ def last_lifecycle(provision_uuid):
         return None
 
 
+def update_lifetime(provision_uuid):
+    positional_args = [provision_uuid]
+    query = f"SELECT max(logged_at) as logged_at \n" \
+            f"FROM lifecycle_log ll \n" \
+            f"WHERE provision_uuid = %s AND state = 'provisioning' \n" \
+            f"LIMIT 1;"
+
+    result = execute_query(query, positional_args=positional_args, autocommit=True)
+
+    if result['rowcount'] >= 1:
+        query_result = result['query_result'][0]
+        provisioning_at = query_result.get('logged_at')
+        lifetime = datetime.utcnow() - provisioning_at
+        print(f"Provision UUID {provision_uuid} lifetime: {lifetime}")
+        positional_args = [lifetime, provision_uuid]
+        query = "UPDATE provisions SET lifetime_interval = %s WHERE uuid = %s RETURNING uuid;"
+        execute_query(query, positional_args=positional_args, autocommit=True)
+
+
 def provision_lifecycle(provision_uuid, current_state, username):
+
+    # TODO: Calculate lifetime using current_state = 'destroy-completed'
+    if current_state == 'destroy-completed':
+        update_lifetime(provision_uuid)
 
     last_state = last_lifecycle(provision_uuid)
 
@@ -336,13 +371,15 @@ def provision_lifecycle(provision_uuid, current_state, username):
         return
 
     print(f"Updating provision {provision_uuid} - last_state = {current_state}")
-    positional_args = [current_state, provision_uuid]
-    query = f"UPDATE provisions SET \n" \
+    current_date = datetime.now(timezone.utc)
+    positional_args = [current_state, current_date, provision_uuid]
+    query = f"SET TIMEZONE='GMT'; \n" \
+            f"UPDATE provisions SET \n" \
             f"  last_state = %s, \n" \
-            f"  modified_at = timezone('UTC', NOW())" \
+            f"  modified_at = %s " \
             f"WHERE uuid = %s RETURNING uuid;"
 
-    cur = execute_query(query, autocommit=True, positional_args=positional_args)
+    cur = execute_query(query, positional_args=positional_args, autocommit=True)
 
     if username is None:
         username = 'gpte-user'
@@ -353,28 +390,19 @@ def provision_lifecycle(provision_uuid, current_state, username):
         username
     ]
 
-    query = f"INSERT INTO lifecycle_log (provision_uuid, state, executor) \n" \
-            f"VALUES ( %s, %s, %s) RETURNING id;"
+    print(f"Inserting Lifecycle log for {provision_uuid} - {current_state} - {username}")
+    query = f"SET TIMEZONE='GMT'; " \
+            f"INSERT INTO lifecycle_log (provision_uuid, state, executor) \n" \
+            f"VALUES (%s, %s, %s) RETURNING id;"
 
-    cur = execute_query(query, autocommit=True, positional_args=positional_args)
+    cur = execute_query(query, positional_args=positional_args, autocommit=True)
 
 
 def update_provision_result(provision_uuid, result='success'):
     positional_args = [result, provision_uuid]
-    query = f"UPDATE provisions SET provision_result = %s WHERE uuid = %s RETURNING uuid;"
+    query = f"SET TIMEZONE='GMT'; UPDATE provisions SET provision_result = %s WHERE uuid = %s RETURNING uuid;"
 
-    execute_query(query, autocommit=True, positional_args=positional_args)
-
-
-def check_provision_exists(provision_uuid, babylon_guid):
-    query = f"SELECT uuid from provisions \n" \
-            f"WHERE uuid = '{provision_uuid}' or babylon_guid = '{babylon_guid}'"
-    result = execute_query(query)
-    if result['rowcount'] >= 1:
-        query_result = result['query_result'][0]
-        return query_result
-    else:
-        return -1
+    cur = execute_query(query, positional_args=positional_args, autocommit=True)
 
 
 def save_resource_claim_data(resource_claim_uuid, as_resource_claim_name, resource_claim_namespace, resource_claim):
@@ -397,7 +425,7 @@ def save_resource_claim_data(resource_claim_uuid, as_resource_claim_name, resour
             f"  resource_claim_namespace = %s"
     positional_args = [resource_claim_uuid, as_resource_claim_name, resource_claim_namespace]
 
-    results = execute_query(query=query, positional_args=positional_args)
+    results = execute_query(query=query, positional_args=positional_args, autocommit=True)
 
     query_result = results['query_result'][0]
 
@@ -440,11 +468,11 @@ def save_provision_vars(resource_claim_uuid, as_resource_claim_name, resource_cl
             f"  resource_claim_namespace = %s"
     positional_args = [resource_claim_uuid, as_resource_claim_name, resource_claim_namespace]
 
-    results = execute_query(query=query, positional_args=positional_args)
+    results = execute_query(query=query, positional_args=positional_args, autocommit=True)
 
     query_result = results['query_result'][0]
 
-    if results['rowcount'] == 1 and query_result.get('total') == 0:
+    if results['rowcount'] == 1 or query_result.get('total') == 0:
         positional_args = [resource_claim_uuid, as_resource_claim_name, resource_claim_namespace,
                            json.dumps(provision_vars)]
         query = 'INSERT INTO resource_claim_log (' \
@@ -457,13 +485,12 @@ def save_provision_vars(resource_claim_uuid, as_resource_claim_name, resource_cl
 
         execute_query(query=query, positional_args=positional_args, autocommit=True)
 
-    elif results['rowcount'] > 1:
+    elif results['rowcount'] >= 1:
         positional_args = [as_resource_claim_name, resource_claim_namespace,
-                           json.dumps(provision_vars), resource_claim_uuid]
+                           resource_claim_uuid]
         query = 'UPDATE resource_claim_log SET' \
                 '  resource_claim_name = %s, \n' \
                 '  resource_claim_namespace = %s, \n' \
-                '  provision_vars_json = %s \n' \
                 'WHERE  provision_uuid = %s \n' \
                 'RETURNING provision_uuid'
 
@@ -472,17 +499,47 @@ def save_provision_vars(resource_claim_uuid, as_resource_claim_name, resource_cl
 
 def timestamp_to_utc(timestamp_received):
     if timestamp_received:
-        timestamp_received_dt = timestamp_received
-        if isinstance(timestamp_received, str):
-            try:
-                timestamp_received_dt = datetime.strptime(timestamp_received, '%Y-%m-%dT%H:%M:%SZ')
-            except ValueError:
-                timestamp_received_dt = datetime.strptime(timestamp_received, '%Y-%m-%dT%H:%M:%S+00:00')
+        local_timezone = tzlocal.get_localzone()
+        provision_job_start_timestamp = datetime.strptime(timestamp_received, '%Y-%m-%dT%H:%M:%S%z')
+        provision_job_start_timestamp = provision_job_start_timestamp.astimezone(local_timezone)
+        provision_job_start_timestamp = provision_job_start_timestamp.replace(tzinfo=pytz.utc)
+        print(provision_job_start_timestamp.replace(tzinfo=pytz.utc))
 
-        tz_info = pytz.timezone('America/New_York')
-        timestamp_received_dt = tz_info.localize(timestamp_received_dt)
-        timestamp_received_utc = timestamp_received_dt.astimezone(pytz.timezone('UTC'))
-        return timestamp_received_utc.strftime('%Y-%m-%dT%H:%M:%S+00:00')
-    else:
-        return timestamp_received
+        utc_tzinfo = pytz.timezone("UTC")
+
+        timestamp_received = provision_job_start_timestamp.astimezone(utc_tzinfo)
+
+    return timestamp_received
+
+
+def create_sql_statement(insert_fields, update_fields, table_name, constraint, return_field):
+
+    positional_args = []
+    list_fields = list(insert_fields.keys())
+    list_str = ", ".join(list_fields)
+
+    query = f"SET TIMEZONE='GMT';\n INSERT INTO {table_name} (%s) \nVALUES( " % list_str
+    list_size = len(list_fields) - 1
+    for index, item in enumerate(list_fields):
+        positional_args.append(insert_fields[item])
+        if index < list_size:
+            query += "%s, "
+        else:
+            query += "%s"
+
+    query += ') \n'
+
+    query += f"ON CONFLICT ON CONSTRAINT {constraint} DO \nUPDATE SET \n"
+
+    for k, v in update_fields.items():
+        positional_args.append(v)
+        query += k + '= %s, \n'
+
+    query = query[:-3]
+    query += f"\nRETURNING {return_field};"
+    debug = False
+    if debug:
+        print(f"Query Insert: \n{query} - {positional_args}")
+
+    return query, positional_args
 
