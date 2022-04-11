@@ -424,6 +424,9 @@ def get_resource_vars(anarchy_subject):
         username = replace.join(temp_username.rsplit('-', 1))
         username = username.replace('-', '.', 1)
 
+    if not resource_claim_namespace:
+        username = 'poolboy'
+
     desired_state = anarchy_subject_spec_vars.get('desired_state')
 
     babylon_guid = anarchy_subject_job_vars.get('guid')
