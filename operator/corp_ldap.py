@@ -6,7 +6,6 @@ from retrying import retry
 class GPTELdap(object):
 
     def __init__(self, logger):
-        # TODO: this is a test we have to read the secrets
         self.ldap_info = utils.get_secret_data('gpte-ldap-secrets')
         self.ldap_hosts = self.ldap_info['ldap_hosts']
         self.ldap_binddn = self.ldap_info['binddn']
@@ -87,6 +86,9 @@ class GPTELdap(object):
         except ldap.LDAPError as e:
             print(e)
 
+        if self.debug:
+            print("USER LDAP Results: ", user_data)
+
         return user_data
 
     def convert_dn_email(self, entry):
@@ -140,3 +142,4 @@ class GPTELdap(object):
             print(e)
 
         return user_data
+

@@ -29,7 +29,7 @@ class GPTEIpaLdap(object):
         except ldap.LDAPError as e:
             self.log.error(f"Error connectint to LDAP {e}")
 
-    def search_ipa_user(self, user_name):
+    def search_ipa_user(self, user_name, attribute='uid'):
         """
         This method search for a *user_name* into GPTE IPA LDAP
         :param user_name: a valid username in GPTE IPA LDAP
@@ -40,7 +40,7 @@ class GPTEIpaLdap(object):
 
         # self.log.info(f"Searching User {user_name} in {self.ldap_hosts} and base dn {self.ldap_basedn}")
         search_scope = ldap.SCOPE_SUBTREE
-        search_filter = f"(&(uid={user_name})(objectClass=posixAccount))"
+        search_filter = f"(&({attribute}={user_name})(objectClass=posixAccount))"
         search_attr = self.ldap_info['searchattribute'].split(',')
 
         ldap_result_id = self.ldap_conn.search(self.ldap_basedn, search_scope, search_filter, search_attr)
@@ -52,12 +52,12 @@ class GPTEIpaLdap(object):
             user_data['title'] = 'other'
         user_data['region'] = self.search_user_region(user_name)
         user_data['partner'] = self.search_user_partner(user_name)
-        user_data['cost_center'] = 'default'
-        user_data['manager_chargeback_id'] = 'default'
+        user_data['cost_center'] = None
+        user_data['manager_chargeback_id'] = None
         user_data['manager'] = {
-            'manager': 'default',
-            'manager_email': 'default',
-            'manager_id': 'default'}
+            'manager': None,
+            'manager_email': None,
+            'manager_id': None}
 
         return user_data
 
@@ -116,3 +116,4 @@ class GPTEIpaLdap(object):
             partner_name = 'partner'
 
         return partner_name
+
