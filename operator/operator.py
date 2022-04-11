@@ -280,7 +280,8 @@ def anarchysubject_event(event, logger, **_):
         logger.warning(event)
         return
 
-    print('DEBUG anarchy_subject: ', anarchy_subject)
+    # TODO: Remove debug message after deploy in production
+    logger.debug(f"DEBUG anarchy_subject: {anarchy_subject}")
 
     anarchy_subject_spec = anarchy_subject['spec']
     anarchy_subject_spec_vars = anarchy_subject_spec['vars']
@@ -380,7 +381,7 @@ def search_ipa_user(user_name, logger, notifier=False):
             logger.info(f"Searching IPA username using uid '{user_name}'")
             results = int_ldap.search_ipa_user(user_name)
 
-    print("DEBUG USER:", results)
+    logger.debug(f"DEBUG USER: {results}")
     return results
 
 
@@ -499,8 +500,8 @@ def prepare(anarchy_subject, logger):
                 resource_claim_namespace, 'resourceclaims', as_resource_claim_name
             )
 
-            print("RESOURCE CLAIM LOG:")
-            print(json.dumps(resource_claim, default=str))
+            logger.debug("RESOURCE CLAIM LOG:")
+            logger.debug(json.dumps(resource_claim, default=str))
             resource_claim_metadata = resource_claim['metadata']
             resource_claim_annotations = resource_claim_metadata['annotations']
             resource_claim_labels = resource_claim_metadata['labels']
@@ -514,8 +515,8 @@ def prepare(anarchy_subject, logger):
                                            resource_claim_namespace, resource_claim)
 
             # Used by CloudForms
-            notifier = resource_claim_annotations.get(f'{babylon_domain}/notifier', False)
-            if notifier and notifier == 'disable':
+            notifier = resource_claim_annotations.get(f'{babylon_domain}/externalPlatformUrl', False)
+            if notifier:
                 resource_name = resource_claim_metadata.get('name')
                 if resource_name:
                     resource_guid = resource_name[-4:]
@@ -570,7 +571,7 @@ def prepare(anarchy_subject, logger):
             provision_time = (provision_job_complete_timestamp - provision_job_start_timestamp).total_seconds() / 60.0
             deploy_interval = provision_job_complete_timestamp - provision_job_start_timestamp
 
-        print(f"Provision Time in Minutes: {provision_time} - Provision Time Interval: {deploy_interval}")
+        logger.debug(f"Provision Time in Minutes: {provision_time} - Provision Time Interval: {deploy_interval}")
 
     provision_job_vars = {}
     if provision_job_id:
@@ -612,8 +613,11 @@ def prepare(anarchy_subject, logger):
     if purpose is None:
         purpose = provision_job_vars.get('purpose', 'Development - Catalog item creation / maintenance')
 
-    if notifier == 'disabled':
-        notifier = True
+    platform_url = None
+    using_cloud_forms = False
+    if notifier:
+        platform_url = notifier
+        using_cloud_forms = True
 
     if '.' in catalog_display_name:
         catalog_display_name = parse_catalog_item(catalog_display_name)
@@ -657,7 +661,8 @@ def prepare(anarchy_subject, logger):
         'purpose': purpose,
         'anarchy_governor': resource_label_governor,
         'anarchy_subject_name': anarchy_subject_metadata.get('name'),
-        'using_cloud_forms': notifier
+        'platform_url': platform_url,
+        'using_cloud_forms': using_cloud_forms
     }
 
     logger.info(f"Provision Details: {provision}")
