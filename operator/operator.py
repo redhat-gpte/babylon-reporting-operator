@@ -477,6 +477,9 @@ def prepare(anarchy_subject, logger):
     resource_claim_requester = anarchy_subject_annotations.get(
         f"{poolboy_domain}/resource-requester-user")
 
+    if resource_claim_requester is None:
+        resource_claim_requester = anarchy_subject_annotations.get(f"{babylon_domain}/requester")
+
     if resource_claim_namespace and not resource_claim_requester:
         replace = '.'
         temp_username = resource_claim_namespace.replace('user-', '')
