@@ -365,14 +365,14 @@ def populate_user(provision, logger):
 
 def search_ipa_user(user_name, logger, notifier=False):
 
-    if '@' in user_name and not notifier:
+    if '@redhat' in user_name and not notifier:
         logger.info(f"Searching CORP LDAP username '{user_name}'")
         corp_ldap = GPTELdap(logger)
         results = corp_ldap.ldap_search_user(user_name)
     else:
         logger.info(f"Searching IPA username '{user_name}'")
         int_ldap = GPTEIpaLdap(logger)
-        if notifier:
+        if notifier and '@' in user_name:
             logger.info(f"Searching IPA username using mail '{user_name}'")
             results = int_ldap.search_ipa_user(user_name, 'mail')
         else:
@@ -474,11 +474,11 @@ def prepare(anarchy_subject, logger):
     resource_guid = None
 
     # Get user name from poolboy annotation and fallback to namespace name
-    resource_claim_requester = anarchy_subject_annotations.get(
-        f"{poolboy_domain}/resource-requester-user")
+    resource_claim_requester = anarchy_subject_annotations.get(f"{babylon_domain}/requester")
 
     if resource_claim_requester is None:
-        resource_claim_requester = anarchy_subject_annotations.get(f"{babylon_domain}/requester")
+        resource_claim_requester = anarchy_subject_annotations.get(
+            f"{poolboy_domain}/resource-requester-user")
 
     if resource_claim_namespace and not resource_claim_requester:
         replace = '.'
