@@ -281,7 +281,7 @@ def anarchysubject_event(event, logger, **_):
         return
 
     # TODO: Remove debug message after deploy in production
-    logger.debug(f"DEBUG anarchy_subject: {anarchy_subject}")
+    logger.info(f"DEBUG anarchy_subject: {anarchy_subject}")
 
     anarchy_subject_spec = anarchy_subject['spec']
     anarchy_subject_spec_vars = anarchy_subject_spec['vars']
@@ -290,11 +290,9 @@ def anarchysubject_event(event, logger, **_):
 
     # TODO: Check if tower jobs is completed
     if event['type'] == 'DELETED' and current_state == 'destroying':
-        logger.info(f"Set retirement date for provision {resource_uuid}")
-
-        # populate_provision(logger, anarchy_subject)
 
         positional_args = [datetime.now(timezone.utc), resource_uuid]
+        logger.info(f"Set retirement date for provision {resource_uuid} - {datetime.now(timezone.utc)}")
         query = f"UPDATE provisions SET retired_at = %s \n" \
                 f"WHERE uuid = %s and retired_at ISNULL RETURNING uuid;"
 
@@ -401,6 +399,7 @@ def get_resource_vars(anarchy_subject):
     anarchy_subject_job_vars = anarchy_subject_spec_vars.get('job_vars', {})
     anarchy_subject_metadata = anarchy_subject['metadata']
     anarchy_subject_annotations = anarchy_subject_metadata['annotations']
+    resource_label_governor = anarchy_subject_spec.get('governor', '')
 
     current_state = anarchy_subject_spec_vars.get('current_state')
 
@@ -424,7 +423,7 @@ def get_resource_vars(anarchy_subject):
         username = replace.join(temp_username.rsplit('-', 1))
         username = username.replace('-', '.', 1)
 
-    if not resource_claim_namespace:
+    if not resource_claim_namespace or 'empty-config' in resource_label_governor:
         username = 'poolboy'
 
     desired_state = anarchy_subject_spec_vars.get('desired_state')
@@ -511,9 +510,6 @@ def prepare(anarchy_subject, logger):
             if f'{babylon_domain}/requester' in resource_claim_annotations:
                 resource_claim_requester = resource_claim_annotations.get(f'{babylon_domain}/requester')
 
-                # if resource_claim_requester and '@' in resource_claim_requester:
-                #     resource_claim_requester = resource_claim_requester.replace('@', '-')
-
             utils.save_resource_claim_data(resource_claim_uuid, as_resource_claim_name,
                                            resource_claim_namespace, resource_claim)
 
@@ -543,7 +539,6 @@ def prepare(anarchy_subject, logger):
 
             # Purpose
             purpose = resource_claim_annotations.get(f"{pfe_domain}/purpose")
-
 
         except ApiException as e:
             if e.status == '404':
