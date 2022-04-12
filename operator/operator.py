@@ -414,16 +414,18 @@ def get_resource_vars(anarchy_subject):
     if f'{babylon_domain}/requester' in anarchy_subject_annotations:
         username = anarchy_subject_annotations.get(f"{babylon_domain}/requester")
     else:
-        username = anarchy_subject_annotations.get(
-            f"{poolboy_domain}/resource-requester-user")
+        username = anarchy_subject_annotations.get(f"{poolboy_domain}/resource-requester-user")
 
-    if resource_claim_namespace and not username:
+    if resource_claim_namespace and username is None:
         replace = '.'
         temp_username = resource_claim_namespace.replace('user-', '')
         username = replace.join(temp_username.rsplit('-', 1))
         username = username.replace('-', '.', 1)
 
-    if not resource_claim_namespace or 'empty-config' in resource_label_governor:
+    if username is None and 'empty-config' in resource_label_governor:
+        username = 'poolboy'
+
+    if not resource_claim_namespace:
         username = 'poolboy'
 
     desired_state = anarchy_subject_spec_vars.get('desired_state')
