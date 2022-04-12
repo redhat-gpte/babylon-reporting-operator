@@ -332,7 +332,7 @@ def populate_provision(logger, anarchy_subject):
                            f"anarchy_governor: {provision.get('anarchy_governor')}")
             provision['user'] = {}
         else:
-            provision['user'] = search_ipa_user(user_name, logger, provision.get('using_cloud_forms'))
+            provision['user'] = search_ipa_user(user_name, logger, provision.get('using_cloud_forms', False))
 
         provision['user_db'] = populate_user(provision, logger)
         provision['catalog_id'] = populate_catalog(provision, logger)
@@ -411,16 +411,16 @@ def get_resource_vars(anarchy_subject):
     resource_claim_namespace = anarchy_subject_annotations.get(f"{poolboy_domain}/resource-claim-namespace")
 
     # Get user name from poolboy annotation and fallback to namespace name
-    if f'{babylon_domain}/requester' in anarchy_subject_annotations:
-        username = anarchy_subject_annotations.get(f"{babylon_domain}/requester")
-    else:
-        username = anarchy_subject_annotations.get(f"{poolboy_domain}/resource-requester-user")
+    username = anarchy_subject_annotations.get(f"{babylon_domain}/requester")
 
-    if resource_claim_namespace and username is None:
+    if username is None:
+        username = anarchy_subject_annotations.get(
+            f"{poolboy_domain}/resource-requester-user")
+
+    if resource_claim_namespace and not username:
         replace = '.'
         temp_username = resource_claim_namespace.replace('user-', '')
         username = replace.join(temp_username.rsplit('-', 1))
-        username = username.replace('-', '.', 1)
 
     if username is None and 'empty-config' in resource_label_governor:
         username = 'poolboy'
