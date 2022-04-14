@@ -609,8 +609,13 @@ def prepare(anarchy_subject, logger):
     elif cloud == 'none':
         cloud = 'shared'
 
+    agnosticd_open_environment = provision_job_vars.get('agnosticd_open_environment', False)
     chargeback_method = 'regional'
-    if 'Open Environment' in catalog_item_display_name:
+    if agnosticd_open_environment:
+        chargeback_method = 'open'
+
+    # This is a fallback if agnosticd_open_environment is False
+    if not agnosticd_open_environment and 'Open Environment' in catalog_item_display_name:
         chargeback_method = 'open'
 
     if purpose is None:
