@@ -323,7 +323,6 @@ def populate_provision(logger, anarchy_subject):
 
     provision = prepare(anarchy_subject, logger)
     if provision:
-
         user_name = provision.get('username')
         if user_name is None:
             logger.warning(f"Unable to get username for provision {provision.get('uuid')} - "
@@ -411,11 +410,10 @@ def get_resource_vars(anarchy_subject):
     resource_claim_namespace = anarchy_subject_annotations.get(f"{poolboy_domain}/resource-claim-namespace")
 
     # Get user name from poolboy annotation and fallback to namespace name
-    username = anarchy_subject_annotations.get(f"{babylon_domain}/requester")
-
-    if username is None:
-        username = anarchy_subject_annotations.get(
-            f"{poolboy_domain}/resource-requester-user")
+    username = anarchy_subject_annotations.get(f"{babylon_domain}/requester",
+                                               anarchy_subject_annotations.get(
+                                                   f"{poolboy_domain}/resource-requester-user")
+                                               )
 
     if resource_claim_namespace and not username:
         replace = '.'
@@ -425,8 +423,9 @@ def get_resource_vars(anarchy_subject):
     if username is None and 'empty-config' in resource_label_governor:
         username = 'poolboy'
 
+    # If we don't have resource_claim_name it means that the provision has been deployed using poolbooy
     if not resource_claim_namespace:
-        username = 'poolboy'
+        resource_claim_requester = 'poolboy'
 
     desired_state = anarchy_subject_spec_vars.get('desired_state')
 
@@ -449,55 +448,29 @@ def prepare(anarchy_subject, logger):
     provision_job_id = provision_job.get('deployerJob')
     provision_job_url = provision_job.get('towerJobURL')
 
+    resource_current_state, resource_desired_state, resource_claim_uuid, resource_claim_requester, babylon_guid = get_resource_vars(anarchy_subject)
+
     # This is the resource claim namespace
     as_resource_claim_name = anarchy_subject_annotations.get(f"{poolboy_domain}/resource-claim-name")
     resource_claim_namespace = anarchy_subject_annotations.get(f"{poolboy_domain}/resource-claim-namespace")
 
-    # This is the resource UUID
-    resource_claim_uuid = anarchy_subject_job_vars.get('uuid',
-                                                       anarchy_subject_annotations.get(
-                                                           f"{poolboy_domain}/resource-handle-uid")
-                                                       )
     logger.info(f"Resource claim UUID: {resource_claim_uuid}")
 
     resource_label_governor = anarchy_subject_spec.get('governor')
     logger.info(f"resource_label_governor: {resource_label_governor}")
 
-    resource_current_state = anarchy_subject_spec_vars.get('current_state')
-    resource_desired_state = anarchy_subject_spec_vars.get('desired_state')
     logger.info(f"Resource UUID: {resource_claim_uuid} - "
                 f"Resource Current State: {resource_current_state} - "
                 f"Resource Desired State: {resource_desired_state}")
 
     catalog_display_name = parse_catalog_item(resource_label_governor)
     catalog_item_display_name = parse_catalog_item(resource_label_governor)
-    resource_guid = None
-
-    # Get user name from poolboy annotation and fallback to namespace name
-    resource_claim_requester = anarchy_subject_annotations.get(f"{babylon_domain}/requester")
-
-    if resource_claim_requester is None:
-        resource_claim_requester = anarchy_subject_annotations.get(
-            f"{poolboy_domain}/resource-requester-user")
-
-    if resource_claim_namespace and not resource_claim_requester:
-        replace = '.'
-        temp_username = resource_claim_namespace.replace('user-', '')
-        resource_claim_requester = replace.join(temp_username.rsplit('-', 1))
-
-    logger.info(f"Provision UUID: {resource_claim_uuid} - "
-                f"Resource Claim Namespace: {resource_claim_namespace} - "
-                f"Resource Claim Name: {as_resource_claim_name} - "
-                f"Resource Current State: {resource_current_state}")
 
     sales_force_id = None
     purpose = None
 
-    # If we don't have resource_claim_name it means that the provision has been deployed using poolbooy
-    if not resource_claim_namespace:
-        resource_claim_requester = 'poolboy'
-
     notifier = False
+    resource_guid = None
     # If we have resource_claim_namespace we have user associated
     if as_resource_claim_name and resource_claim_namespace and \
             resource_current_state not in ('destroying', 'destroy-failed', 'starting'):
@@ -512,8 +485,6 @@ def prepare(anarchy_subject, logger):
             resource_claim_metadata = resource_claim['metadata']
             resource_claim_annotations = resource_claim_metadata['annotations']
             resource_claim_labels = resource_claim_metadata['labels']
-            if f'{babylon_domain}/requester' in resource_claim_annotations:
-                resource_claim_requester = resource_claim_annotations.get(f'{babylon_domain}/requester')
 
             utils.save_resource_claim_data(resource_claim_uuid, as_resource_claim_name,
                                            resource_claim_namespace, resource_claim)
