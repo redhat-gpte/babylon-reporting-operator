@@ -563,9 +563,6 @@ def prepare(anarchy_subject, logger):
     class_list = resource_label_governor.split('.')
     class_name = f"{class_list[2]}_{class_list[1].replace('-', '_')}".upper()
 
-    sandbox_account = anarchy_subject_job_vars.get('sandbox_account', provision_data.get('ibm_sandbox_account'))
-    sandbox_name = anarchy_subject_job_vars.get('sandbox_name', provision_data.get('ibm_sandbox_name'))
-
     workshop_users = provision_job_vars.get('user_count', provision_job_vars.get('num_users', 1))
 
     datasource = provision_job_vars.get('platform', 'BABYLON').upper()
@@ -579,6 +576,15 @@ def prepare(anarchy_subject, logger):
         cloud = 'openstack'
     elif cloud == 'none':
         cloud = 'shared'
+
+    azure_tenant = provision_data.get('azure_subscription')
+    azure_subscription = provision_data.get('azure_subscription')
+
+    if cloud == 'azure':
+        sandbox_name = provision_data.get('sandbox_name')
+    else:
+        sandbox_account = anarchy_subject_job_vars.get('sandbox_account', provision_data.get('ibm_sandbox_account'))
+        sandbox_name = anarchy_subject_job_vars.get('sandbox_name', provision_data.get('ibm_sandbox_name'))
 
     agnosticd_open_environment = provision_job_vars.get('agnosticd_open_environment', False)
     chargeback_method = 'regional'
@@ -641,6 +647,8 @@ def prepare(anarchy_subject, logger):
         'anarchy_governor': resource_label_governor,
         'anarchy_subject_name': anarchy_subject_metadata.get('name'),
         'platform_url': platform_url,
+        'azure_tenant': azure_tenant,
+        'azure_subscription': azure_subscription,
         'using_cloud_forms': using_cloud_forms
     }
 
