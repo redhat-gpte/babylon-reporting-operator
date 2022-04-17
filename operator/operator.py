@@ -286,6 +286,10 @@ def get_resource_vars(anarchy_subject):
     resource_claim_namespace = anarchy_subject_annotations.get(f"{poolboy_domain}/resource-claim-namespace")
     resource_claim_name = anarchy_subject_annotations.get(f"{poolboy_domain}/resource-claim-name")
 
+    # If we don't have resource_claim_name it means that the provision has been deployed using poolbooy
+    if not resource_claim_namespace:
+        resource_claim_requester = 'poolboy'
+
     # Get user name from poolboy annotation and fallback to namespace name
     resource_claim_requester = anarchy_subject_annotations.get(f"{babylon_domain}/requester",
                                                anarchy_subject_annotations.get(
@@ -295,13 +299,12 @@ def get_resource_vars(anarchy_subject):
     if resource_claim_requester is None and 'empty-config' in resource_label_governor:
         resource_claim_requester = 'poolboy'
 
-    # If we don't have resource_claim_name it means that the provision has been deployed using poolbooy
-    if not resource_claim_namespace:
-        resource_claim_requester = 'poolboy'
-    elif resource_claim_namespace and not resource_claim_requester:
-        replace = '.'
-        temp_username = resource_claim_namespace.replace('user-', '')
-        resource_claim_requester = replace.join(temp_username.rsplit('-', 1))
+    resource_claim_requester_email = anarchy_subject_annotations.get(f"{babylon_domain}/requester-email")
+
+    # elif resource_claim_namespace and not resource_claim_requester:
+    #     replace = '.'
+    #     temp_username = resource_claim_namespace.replace('user-', '')
+    #     resource_claim_requester = replace.join(temp_username.rsplit('-', 1))
 
     desired_state = anarchy_subject_spec_vars.get('desired_state')
 
@@ -322,6 +325,7 @@ def get_resource_vars(anarchy_subject):
         'resource_claim_uuid': resource_uuid,
         'username': resource_claim_requester,
         'resource_claim_requester': resource_claim_requester,
+        'resource_claim_requester_email': resource_claim_requester_email,
         'babylon_guid': babylon_guid,
         'tower_jobs': tower_jobs,
         'provision_job': provision_job,
