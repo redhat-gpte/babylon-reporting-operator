@@ -207,7 +207,6 @@ def execute_query(query, positional_args=None, autocommit=False):
 
         except Exception as e:
             db_pool_conn.rollback()
-
             cursor.close()
             db_connection.putconn(db_pool_conn)
             print("Cannot execute SQL \n"
@@ -218,33 +217,33 @@ def execute_query(query, positional_args=None, autocommit=False):
                   "" % (query, arguments, e, query_list))
             db_connection.closeall()
 
-    if autocommit:
-        db_pool_conn.commit()
-    else:
-        db_pool_conn.rollback()
-
-    kw = dict(
-        changed=changed,
-        query=cursor.query,
-        query_list=query_list,
-        statusmessage=statusmessage,
-        query_result=query_result,
-        query_all_results=query_all_results,
-        rowcount=rowcount,
-    )
-
     try:
+        if autocommit:
+            db_pool_conn.commit()
+        else:
+            db_pool_conn.rollback()
+
+        kw = dict(
+            changed=changed,
+            query=cursor.query,
+            query_list=query_list,
+            statusmessage=statusmessage,
+            query_result=query_result,
+            query_all_results=query_all_results,
+            rowcount=rowcount,
+        )
+
         cursor.close()
         db_connection.putconn(db_pool_conn)
+
+        # closing database connection.
+        # use closeall() method to close all the active connection if you want to turn of the application
+        db_connection.closeall()
+        del db_connection
+        return kw
     except Exception as e:
         print(f"ERROR closing connection {e}")
         pass
-
-    # closing database connection.
-    # use closeall() method to close all the active connection if you want to turn of the application
-    db_connection.closeall()
-    del db_connection
-    return kw
 
 
 def parse_null_value(value):
@@ -405,96 +404,100 @@ def update_provision_result(provision_uuid, result='success'):
     cur = execute_query(query, positional_args=positional_args, autocommit=True)
 
 
-def save_resource_claim_data(resource_claim_uuid, as_resource_claim_name, resource_claim_namespace, resource_claim):
+def save_resource_claim_data(resource_claim_uuid, resource_claim_name, resource_claim_namespace, resource_claim):
     if len(resource_claim) == 0:
         print('Resource Claim log size 0, do not insert into db')
+        return
+
+    if resource_claim_uuid is None:
         return
 
     resource_claim_metadata = resource_claim.get('metadata', {})
     resource_claim_metadata.pop('managedFields')
 
-    resource_claim_log = {}
-    resource_claim_log.update({'metadata': resource_claim_metadata})
+    resource_claim_spec = resource_claim.get('spec', {})
+    if 'provision_messages' in resource_claim_spec:
+        resource_claim_spec.pop('provision_messages')
 
-    # first check if already exists
-    query = f"SELECT count(*) as total \n" \
-            f"FROM resource_claim_log \n" \
-            f"WHERE \n" \
-            f"  provision_uuid = %s AND \n" \
-            f"  resource_claim_name = %s AND \n" \
-            f"  resource_claim_namespace = %s"
-    positional_args = [resource_claim_uuid, as_resource_claim_name, resource_claim_namespace]
+    resource_claim_json = {
+        'metadata': resource_claim_metadata,
+        'spec': resource_claim_spec,
+        'status': resource_claim.get('status', {})
+    }
 
-    results = execute_query(query=query, positional_args=positional_args, autocommit=True)
-
-    query_result = results['query_result'][0]
-
-    if results['rowcount'] == 1 and query_result.get('total') == 0:
-        positional_args = [resource_claim_uuid, as_resource_claim_name, resource_claim_namespace,
-                           json.dumps(resource_claim_log)]
-        query = 'INSERT INTO resource_claim_log (' \
-                '  provision_uuid, \n' \
-                '  resource_claim_name, \n' \
-                '  resource_claim_namespace, \n' \
-                '  resource_claim_json) \n' \
-                'VALUES ( %s, %s, %s, %s ) \n' \
-                'RETURNING provision_uuid'
-
-        execute_query(query=query, positional_args=positional_args, autocommit=True)
-
-    elif results['rowcount'] > 1:
-        positional_args = [as_resource_claim_name, resource_claim_namespace,
-                           json.dumps(resource_claim_log), resource_claim_uuid]
-        query = 'UPDATE resource_claim_log SET' \
-                '  resource_claim_name = %s, \n' \
-                '  resource_claim_namespace = %s, \n' \
-                '  resource_claim_json = %s \n' \
-                'WHERE  provision_uuid = %s \n' \
-                'RETURNING provision_uuid'
-        execute_query(query=query, positional_args=positional_args, autocommit=True)
+    insert_fields = {
+        'provision_uuid': resource_claim_uuid,
+        'resource_claim_name': resource_claim_name,
+        'resource_claim_namespace': resource_claim_namespace,
+        'resource_claim_json': json.dumps(resource_claim_json),
+        'created_at': datetime.now(timezone.utc)
+    }
+    update_fields = {
+        'resource_claim_name': resource_claim_name,
+        'resource_claim_namespace': resource_claim_namespace,
+        'resource_claim_json': json.dumps(resource_claim_json),
+    }
 
 
-def save_provision_vars(resource_claim_uuid, as_resource_claim_name, resource_claim_namespace, provision_vars):
+    query, positional_args = create_sql_statement(insert_fields=insert_fields,
+                                                        update_fields=update_fields,
+                                                        table_name='resource_claim_log',
+                                                        constraint='resource_claim_log_pk',
+                                                        return_field='provision_uuid')
+    cur = execute_query(query, positional_args=positional_args, autocommit=True)
+
+def save_tower_extra_vars(resource_claim_uuid, resource_claim_name, resource_claim_namespace, provision_vars):
+
     if len(provision_vars) == 0:
         print('Provision vars size 0, do not insert into db')
         return
 
-    # first check if already exists
-    query = f"SELECT count(*) as total \n" \
-            f"FROM resource_claim_log \n" \
-            f"WHERE \n" \
-            f"  provision_uuid = %s AND \n" \
-            f"  resource_claim_name = %s AND \n" \
-            f"  resource_claim_namespace = %s"
-    positional_args = [resource_claim_uuid, as_resource_claim_name, resource_claim_namespace]
+    insert_fields = {
+        'provision_uuid': resource_claim_uuid,
+        'resource_claim_name': resource_claim_name,
+        'resource_claim_namespace': resource_claim_namespace,
+        'tower_extra_vars_json': json.dumps(provision_vars),
+        'created_at': datetime.now(timezone.utc)
+    }
+    update_fields = {
+        'resource_claim_name': resource_claim_name,
+        'resource_claim_namespace': resource_claim_namespace,
+        'tower_extra_vars_json': json.dumps(provision_vars),
+    }
 
-    results = execute_query(query=query, positional_args=positional_args, autocommit=True)
+    query, positional_args = create_sql_statement(insert_fields=insert_fields,
+                                                        update_fields=update_fields,
+                                                        table_name='resource_claim_log',
+                                                        constraint='resource_claim_log_pk',
+                                                        return_field='provision_uuid')
+    cur = execute_query(query, positional_args=positional_args, autocommit=True)
 
-    query_result = results['query_result'][0]
 
-    if results['rowcount'] == 1 or query_result.get('total') == 0:
-        positional_args = [resource_claim_uuid, as_resource_claim_name, resource_claim_namespace,
-                           json.dumps(provision_vars)]
-        query = 'INSERT INTO resource_claim_log (' \
-                '  provision_uuid, \n' \
-                '  resource_claim_name, \n' \
-                '  resource_claim_namespace, \n' \
-                '  provision_vars_json) \n' \
-                'VALUES ( %s, %s, %s, %s ) \n' \
-                'RETURNING provision_uuid'
+def save_provision_vars(resource_claim_uuid, resource_claim_name, resource_claim_namespace, provision_vars):
 
-        execute_query(query=query, positional_args=positional_args, autocommit=True)
+    if len(provision_vars) == 0:
+        print('Provision vars size 0, do not insert into db')
+        return
 
-    elif results['rowcount'] >= 1:
-        positional_args = [as_resource_claim_name, resource_claim_namespace,
-                           resource_claim_uuid]
-        query = 'UPDATE resource_claim_log SET' \
-                '  resource_claim_name = %s, \n' \
-                '  resource_claim_namespace = %s, \n' \
-                'WHERE  provision_uuid = %s \n' \
-                'RETURNING provision_uuid'
+    insert_fields = {
+        'provision_uuid': resource_claim_uuid,
+        'resource_claim_name': resource_claim_name,
+        'resource_claim_namespace': resource_claim_namespace,
+        'provision_vars_json': json.dumps(provision_vars, default=str),
+        'created_at': datetime.now(timezone.utc)
+    }
+    update_fields = {
+        'resource_claim_name': resource_claim_name,
+        'resource_claim_namespace': resource_claim_namespace,
+        'provision_vars_json': json.dumps(provision_vars, default=str),
+    }
 
-        execute_query(query=query, positional_args=positional_args, autocommit=True)
+    query, positional_args = create_sql_statement(insert_fields=insert_fields,
+                                                        update_fields=update_fields,
+                                                        table_name='resource_claim_log',
+                                                        constraint='resource_claim_log_pk',
+                                                        return_field='provision_uuid')
+    cur = execute_query(query, positional_args=positional_args, autocommit=True)
 
 
 def timestamp_to_utc(timestamp_received):

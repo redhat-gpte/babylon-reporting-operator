@@ -40,202 +40,65 @@ core_v1_api = kubernetes.client.CoreV1Api()
 custom_objects_api = kubernetes.client.CustomObjectsApi()
 namespaces = {}
 
-# TODO: Move events out of operator.py
 
+def handle_anarchy_events(logger, anarchy_subject, resource_vars):
+    possible_states = [
+        'None',
+        'new',
+        'provision-pending',
+        'provisioning',
+        'provision',
+        'provision-failed' ,
+        'started',
+        'start-pending',
+        'starting',
+        'start-failed',
+        'stop-pending',
+        'stopping',
+        'stop-failed',
+        'stopped',
+        'destroying',
+        'destroy-failed',
+        'destroy-canceled',
+    ]
 
-def handle_no_event(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
-    logger.info(f"Ignore action for the state '{current_state}'")
+    resource_current_state = resource_vars.get('current_state')
+    resource_desired_state = resource_vars.get('desired_state')
+    resource_claim_uuid = resource_vars.get('resource_claim_uuid')
+    resource_claim_requester = resource_vars.get('resource_claim_requester')
 
+    if resource_current_state not in possible_states or resource_current_state in ('new', None):
+        logger.warning(f"Current state '{resource_current_state}' not found. Provision UUID: {resource_claim_uuid}")
+        logger.info(f"Ignore action for {resource_claim_uuid} - {resource_vars}")
+        return
 
-def handle_event_provision_pending(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
+    last_action = utils.last_lifecycle(resource_claim_uuid)
 
-    logger.info(f"Handle event provision pending for {resource_uuid}.")
+    log_info = {'last_action': last_action,
+                'provision_uuid': resource_claim_uuid,
+                'current_state': resource_current_state,
+                'desired_state': resource_desired_state}
 
-    populate_provision(logger, anarchy_subject)
+    logger.info(f"Handle event provision {resource_current_state} {log_info}")
 
-    utils.provision_lifecycle(resource_uuid, current_state, username)
+    populate_provision(logger, anarchy_subject, resource_vars)
 
-
-def handle_event_provisioning(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
-
-    logger.info(f"Handle event provisioning for {resource_uuid}.")
-
-    utils.provision_lifecycle(resource_uuid, current_state, username)
-
-
-def handle_event_provision_failed(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
-
-    logger.info(f"Handle event provision failed for {resource_uuid}.")
-
-    populate_provision(logger, anarchy_subject)
-
-    last_action = utils.last_lifecycle(resource_uuid)
+    last_action = utils.last_lifecycle(resource_claim_uuid)
 
     # Update provision_results if the last action was provision
-    if last_action and last_action.startswith('provision'):
+    logger.info(f"handle_anarchy_events: {log_info}:")
+    if last_action == 'provisioning':
+        if 'failed' in last_action:
+            utils.provision_lifecycle(resource_claim_uuid, 'provision-failed', resource_claim_requester)
+            utils.update_provision_result(resource_claim_uuid, 'failure')
+        else:
+            utils.provision_lifecycle(resource_claim_uuid, 'provision-completed', resource_claim_requester)
+            # utils.update_provision_result(resource_claim_uuid, 'success')
+    elif last_action and last_action.startswith('provision'):
         logger.info("Last action was provision, updating provision_result")
-        utils.update_provision_result(resource_uuid, 'failure')
-
-    utils.provision_lifecycle(resource_uuid, current_state, username)
-
-
-def handle_event_provision_complete(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
-
-    logger.info(f"Handle event provision complete for {resource_uuid}.")
-
-    populate_provision(logger, anarchy_subject)
-
-    utils.provision_lifecycle(resource_uuid, current_state, username)
-
-
-def handle_event_started(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
-
-    logger.info(f"Handle event started for {resource_uuid}.")
-
-    populate_provision(logger, anarchy_subject)
-
-    last_state = utils.last_lifecycle(resource_uuid)
-    if last_state == 'provisioning':
-        utils.provision_lifecycle(resource_uuid, 'provision-completed', username)
-
-    utils.provision_lifecycle(resource_uuid, current_state, username)
-
-
-def handle_event_start_pending(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
-
-    logger.info(f"Handle event start pending for {resource_uuid}.")
-
-    populate_provision(logger, anarchy_subject)
-
-    utils.provision_lifecycle(resource_uuid, current_state, username)
-
-
-def handle_event_starting(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
-
-    logger.info(f"Handle event starting for {resource_uuid}.")
-
-    populate_provision(logger, anarchy_subject)
-
-    utils.provision_lifecycle(resource_uuid, current_state, username)
-
-
-def handle_event_start_failed(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
-
-    logger.info(f"Handle event start failed for {resource_uuid}.")
-
-    populate_provision(logger, anarchy_subject)
-
-    last_state = utils.last_lifecycle(resource_uuid)
-    if last_state == 'provisioning':
-        utils.provision_lifecycle(resource_uuid, 'provision-failed', username)
-
-    last_action = utils.last_lifecycle(resource_uuid)
-
-    # if last action was provision we have to update provision_results
-    if last_action.startswith('provision'):
-        logger.info("Last action was provision, needs to update provision_results")
-        utils.update_provision_result(resource_uuid, 'failure')
-
-    utils.provision_lifecycle(resource_uuid, current_state, username)
-
-
-def handle_event_stop_pending(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
-
-    logger.info(f"Handle event stop pending for {resource_uuid}.")
-
-    populate_provision(logger, anarchy_subject)
-
-    utils.provision_lifecycle(resource_uuid, current_state, username)
-
-
-def handle_event_stopping(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
-
-    logger.info(f"Handle event stopping for {resource_uuid}.")
-
-    populate_provision(logger, anarchy_subject)
-
-    utils.provision_lifecycle(resource_uuid, current_state, username)
-
-
-def handle_event_stop_failed(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
-
-    logger.info(f"Handle event stop failed for {resource_uuid}.")
-
-    populate_provision(logger, anarchy_subject)
-
-    utils.provision_lifecycle(resource_uuid, current_state, username)
-
-
-def handle_event_stopped(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
-
-    logger.info(f"Handle event stopped for {resource_uuid}.")
-
-    populate_provision(logger, anarchy_subject)
-
-    utils.provision_lifecycle(resource_uuid, current_state, username)
-
-
-def handle_event_destroying(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
-
-    logger.info(f"Handle event destroying for {resource_uuid}.")
-
-    populate_provision(logger, anarchy_subject)
-
-    utils.provision_lifecycle(resource_uuid, current_state, username)
-
-
-def handle_event_destroy_failed(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
-
-    logger.info(f"Handle event destroy failed for {resource_uuid}.")
-
-    populate_provision(logger, anarchy_subject)
-
-    utils.provision_lifecycle(resource_uuid, current_state, username)
-
-
-def handle_event_destroy_canceled(logger, anarchy_subject):
-    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
-
-    logger.info(f"Handle event destroy failed for {resource_uuid}.")
-
-    populate_provision(logger, anarchy_subject)
-
-    utils.provision_lifecycle(resource_uuid, current_state, username)
-
-
-resource_states = {
-    'None': handle_no_event,
-    'new': handle_no_event,
-    'provision-pending': handle_event_provision_pending,
-    'provisioning': handle_event_provisioning,
-    'provision-failed': handle_event_provision_failed,
-    'started': handle_event_started,
-    'start-pending': handle_event_start_pending,
-    'starting': handle_event_starting,
-    'start-failed': handle_event_start_failed,
-    'stop-pending': handle_event_stop_pending,
-    'stopping': handle_event_stopping,
-    'stop-failed': handle_event_stop_failed,
-    'stopped': handle_event_stopped,
-    'destroying': handle_event_destroying,
-    'destroy-failed': handle_event_destroy_failed,
-    'destroy-canceled': handle_event_destroy_canceled
-}
+        utils.update_provision_result(resource_claim_uuid, 'failure')
+    else:
+        utils.provision_lifecycle(resource_claim_uuid, resource_current_state, resource_claim_requester)
 
 
 @kopf.on.startup()
@@ -280,64 +143,76 @@ def anarchysubject_event(event, logger, **_):
         logger.warning(event)
         return
 
-    # TODO: Remove debug message after deploy in production
-    logger.info(f"DEBUG anarchy_subject: {anarchy_subject}")
+    # # TODO: Remove debug message after deploy in production
+    # logger.info(f"DEBUG anarchy_subject: {anarchy_subject}")
 
-    anarchy_subject_spec = anarchy_subject['spec']
-    anarchy_subject_spec_vars = anarchy_subject_spec['vars']
+    resource_vars = get_resource_vars(anarchy_subject)
+    resource_current_state = resource_vars.get('current_state')
+    resource_desired_state = resource_vars.get('desired_state')
+    resource_claim_uuid = resource_vars.get('resource_claim_uuid')
+    resource_claim_requester = resource_vars.get('resource_claim_requester')
 
-    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
+    if not resource_current_state or resource_current_state in ('new', 'provision-pending'):
+        logger.info(f"Provision: {resource_claim_uuid} - "
+                       f"Current State: '{resource_current_state}'. "
+                       f"We have to ignore it!")
+        return
 
     # TODO: Check if tower jobs is completed
-    if event['type'] == 'DELETED' and current_state == 'destroying':
+    if event['type'] == 'DELETED' and resource_current_state == 'destroying':
 
-        positional_args = [datetime.now(timezone.utc), resource_uuid]
-        logger.info(f"Set retirement date for provision {resource_uuid} - {datetime.now(timezone.utc)}")
+        positional_args = [datetime.now(timezone.utc), resource_claim_uuid]
+        logger.info(f"Set retirement date for provision {resource_claim_uuid} - {datetime.now(timezone.utc)}")
         query = f"UPDATE provisions SET retired_at = %s \n" \
                 f"WHERE uuid = %s and retired_at ISNULL RETURNING uuid;"
 
         utils.execute_query(query, positional_args=positional_args, autocommit=True)
 
-        utils.provision_lifecycle(resource_uuid, 'destroy-completed', username)
+        utils.provision_lifecycle(resource_claim_uuid, 'destroy-completed', resource_claim_requester)
 
         return
-
-    if current_state in resource_states:
-        resource_states[current_state](logger, anarchy_subject)
     else:
-        logger.warning(f"Current state '{current_state}' not found. Provision UUID: {resource_uuid}")
-        return
-
-    if not current_state or current_state in ('new', 'provision-pending'):
-        logger.warning(f"Provision: {resource_uuid} - "
-                       f"Current State: '{anarchy_subject_spec_vars.get('current_state')}'. "
-                       f"We have to ignore it!")
-        return
+        handle_anarchy_events(logger, anarchy_subject, resource_vars)
+    # elif resource_current_state in resource_states:
+    #     resource_states[resource_current_state](logger, anarchy_subject, resource_vars)
+    # else:
+    #     logger.warning(f"Current state '{resource_current_state}' not found. Provision UUID: {resource_claim_uuid}")
+    #     return
 
 
-def populate_provision(logger, anarchy_subject):
+def populate_provision(logger, anarchy_subject, resource_vars):
     invalid_states = ['provision-pending']
-    current_state, desired_state, resource_uuid, username, babylon_guid = get_resource_vars(anarchy_subject)
-    if current_state in invalid_states:
+
+    resource_current_state = resource_vars.get('current_state')
+    resource_claim_uuid = resource_vars.get('resource_claim_uuid')
+    logger.info(f"LOGGER populate_provision: {resource_claim_uuid} - {resource_vars}")
+
+    if resource_current_state in invalid_states:
         return
 
-    provision = prepare(anarchy_subject, logger)
-    if provision:
-        user_name = provision.get('username')
-        if user_name is None:
-            logger.warning(f"Unable to get username for provision {provision.get('uuid')} - "
-                           f"Current State: {provision.get('current_state')} - "
-                           f"anarchy_subject_name: {provision.get('anarchy_subject_name')} -"
-                           f"anarchy_governor: {provision.get('anarchy_governor')}")
-            provision['user'] = {}
-        else:
-            provision['user'] = search_ipa_user(user_name, logger, provision.get('using_cloud_forms', False))
+    if not resource_claim_uuid:
+        logger.error("Provision UUID is None")
+        return
 
-        provision['user_db'] = populate_user(provision, logger)
-        provision['catalog_id'] = populate_catalog(provision, logger)
+    provision = prepare(anarchy_subject, logger, resource_vars)
 
-        prov = Provisions(logger, provision)
-        prov.populate_provisions()
+    logger.info(f"Populate Provision: {provision}")
+
+    user_name = provision.get('username')
+    if user_name is None:
+        logger.warning(f"Unable to get username for provision {provision.get('uuid')} - "
+                       f"Current State: {provision.get('current_state')} - "
+                       f"anarchy_subject_name: {provision.get('anarchy_subject_name')} -"
+                       f"anarchy_governor: {provision.get('anarchy_governor')}")
+        provision['user'] = {}
+    else:
+        provision['user'] = search_ipa_user(user_name, logger, provision.get('using_cloud_forms', False))
+
+    provision['user_db'] = populate_user(provision, logger)
+    provision['catalog_id'] = populate_catalog(provision, logger)
+
+    prov = Provisions(logger, provision)
+    prov.populate_provisions()
 
 
 def populate_catalog(provision, logger):
@@ -398,95 +273,132 @@ def get_resource_vars(anarchy_subject):
     anarchy_subject_job_vars = anarchy_subject_spec_vars.get('job_vars', {})
     anarchy_subject_metadata = anarchy_subject['metadata']
     anarchy_subject_annotations = anarchy_subject_metadata['annotations']
-    resource_label_governor = anarchy_subject_spec.get('governor', '')
+    anarchy_subject_status = anarchy_subject.get('status', {})
 
+    resource_label_governor = anarchy_subject_spec.get('governor', '')
+    anarchy_subject_name = anarchy_subject_metadata.get('name')
     current_state = anarchy_subject_spec_vars.get('current_state')
 
     resource_uuid = anarchy_subject_job_vars.get('uuid',
                                                  anarchy_subject_annotations.get(
                                                      f"{poolboy_domain}/resource-handle-uid")
                                                  )
-
     resource_claim_namespace = anarchy_subject_annotations.get(f"{poolboy_domain}/resource-claim-namespace")
+    resource_claim_name = anarchy_subject_annotations.get(f"{poolboy_domain}/resource-claim-name")
 
     # Get user name from poolboy annotation and fallback to namespace name
-    username = anarchy_subject_annotations.get(f"{babylon_domain}/requester",
+    resource_claim_requester = anarchy_subject_annotations.get(f"{babylon_domain}/requester",
                                                anarchy_subject_annotations.get(
                                                    f"{poolboy_domain}/resource-requester-user")
                                                )
 
-    if resource_claim_namespace and not username:
-        replace = '.'
-        temp_username = resource_claim_namespace.replace('user-', '')
-        username = replace.join(temp_username.rsplit('-', 1))
-
-    if username is None and 'empty-config' in resource_label_governor:
-        username = 'poolboy'
+    if resource_claim_requester is None and 'empty-config' in resource_label_governor:
+        resource_claim_requester = 'poolboy'
 
     # If we don't have resource_claim_name it means that the provision has been deployed using poolbooy
     if not resource_claim_namespace:
         resource_claim_requester = 'poolboy'
+    elif resource_claim_namespace and not resource_claim_requester:
+        replace = '.'
+        temp_username = resource_claim_namespace.replace('user-', '')
+        resource_claim_requester = replace.join(temp_username.rsplit('-', 1))
 
     desired_state = anarchy_subject_spec_vars.get('desired_state')
 
-    babylon_guid = anarchy_subject_job_vars.get('guid')
-
-    return current_state, desired_state, resource_uuid, username, babylon_guid
-
-
-def prepare(anarchy_subject, logger):
-    anarchy_subject_spec = anarchy_subject['spec']
-    anarchy_subject_spec_vars = anarchy_subject_spec['vars']
-    anarchy_subject_metadata = anarchy_subject['metadata']
-    anarchy_subject_annotations = anarchy_subject_metadata['annotations']
-    anarchy_subject_labels = anarchy_subject_metadata['labels']
     provision_data = anarchy_subject_spec_vars.get('provision_data', {})
-    anarchy_subject_job_vars = anarchy_subject_spec_vars.get('job_vars', {})
-    anarchy_subject_status = anarchy_subject.get('status', {})
     tower_jobs = anarchy_subject_status.get('towerJobs', {})
     provision_job = tower_jobs.get('provision', {})
-    provision_job_id = provision_job.get('deployerJob')
-    provision_job_url = provision_job.get('towerJobURL')
+    job_vars = anarchy_subject_spec_vars.get('job_vars', {})
 
-    resource_current_state, resource_desired_state, resource_claim_uuid, resource_claim_requester, babylon_guid = get_resource_vars(anarchy_subject)
+    sandbox_account = anarchy_subject_job_vars.get('sandbox_account', provision_data.get('ibm_sandbox_account'))
+    sandbox_name = anarchy_subject_job_vars.get('sandbox_name', provision_data.get('ibm_sandbox_name'))
 
-    # This is the resource claim namespace
-    as_resource_claim_name = anarchy_subject_annotations.get(f"{poolboy_domain}/resource-claim-name")
-    resource_claim_namespace = anarchy_subject_annotations.get(f"{poolboy_domain}/resource-claim-namespace")
+    babylon_guid = provision_job.get('guid', anarchy_subject_job_vars.get('guid')),
+    cloud_region = provision_job.get('region', anarchy_subject_job_vars.get('region'))
 
-    logger.info(f"Resource claim UUID: {resource_claim_uuid}")
+    kw = {
+        'current_state': current_state,
+        'desired_state': desired_state,
+        'resource_claim_uuid': resource_uuid,
+        'username': resource_claim_requester,
+        'resource_claim_requester': resource_claim_requester,
+        'babylon_guid': babylon_guid,
+        'tower_jobs': tower_jobs,
+        'provision_job': provision_job,
+        'provision_data': provision_data,
+        'sandbox_name': sandbox_name,
+        'sandbox_account': sandbox_account,
+        'cloud_region': cloud_region,
+        'job_vars': job_vars,
+        'anarchy_subject_name': anarchy_subject_name,
+        'resource_claim_namespace': resource_claim_namespace,
+        'resource_claim_name': resource_claim_name,
+        'resource_label_governor': resource_label_governor
+    }
 
-    resource_label_governor = anarchy_subject_spec.get('governor')
-    logger.info(f"resource_label_governor: {resource_label_governor}")
+    return kw
 
-    logger.info(f"Resource UUID: {resource_claim_uuid} - "
-                f"Resource Current State: {resource_current_state} - "
-                f"Resource Desired State: {resource_desired_state}")
+
+def prepare(anarchy_subject, logger, resource_vars):
+
+    resource_current_state = resource_vars.get('current_state')
+    resource_desired_state = resource_vars.get('desired_state')
+    resource_claim_uuid = resource_vars.get('resource_claim_uuid')
+    resource_claim_requester = resource_vars.get('resource_claim_requester')
+    resource_claim_name = resource_vars.get('resource_claim_name')
+    resource_claim_namespace = resource_vars.get('resource_claim_namespace')
+    resource_label_governor = resource_vars.get('resource_label_governor')
 
     catalog_display_name = parse_catalog_item(resource_label_governor)
     catalog_item_display_name = parse_catalog_item(resource_label_governor)
 
+    provision_data = resource_vars.get('provision_data')
+    provision_job = resource_vars.get('provision_job')
+    provision_job_id = provision_job.get('deployerJob')
+    provision_job_url = provision_job.get('towerJobURL')
+
+    provision_job_start_timestamp = utils.timestamp_to_utc(provision_job.get('startTimestamp'))
+    provision_job_complete_timestamp = utils.timestamp_to_utc(provision_job.get('completeTimestamp'))
+
+    class_list = resource_label_governor.split('.')
+    class_name = f"{class_list[2]}_{class_list[1].replace('-', '_')}".upper()
+
+    chargeback_method = 'regional'
     sales_force_id = None
     purpose = None
-
     notifier = False
     resource_guid = None
+    provision_time = 0
+    deploy_interval = None
+    provision_job_vars = {}
+    platform_url = None
+    using_cloud_forms = False
+
+
+    logger.info(f"Resource claim UUID: {resource_claim_uuid} - resource_label_governor: {resource_label_governor}")
+    logger.info(f"Resource UUID: {resource_claim_uuid} - "
+                f"Resource Current State: {resource_current_state} - "
+                f"Resource Desired State: {resource_desired_state}")
+
+
     # If we have resource_claim_namespace we have user associated
-    if as_resource_claim_name and resource_claim_namespace and \
+    if resource_claim_name and resource_claim_namespace and \
             resource_current_state not in ('destroying', 'destroy-failed', 'starting'):
         try:
             resource_claim = custom_objects_api.get_namespaced_custom_object(
                 poolboy_domain, poolboy_api_version,
-                resource_claim_namespace, 'resourceclaims', as_resource_claim_name
+                resource_claim_namespace, 'resourceclaims', resource_claim_name
             )
 
+            # TODO: Remove debug messages
             logger.debug("RESOURCE CLAIM LOG:")
-            logger.debug(json.dumps(resource_claim, default=str))
+            logger.info(json.dumps(resource_claim, default=str))
+
             resource_claim_metadata = resource_claim['metadata']
             resource_claim_annotations = resource_claim_metadata['annotations']
             resource_claim_labels = resource_claim_metadata['labels']
 
-            utils.save_resource_claim_data(resource_claim_uuid, as_resource_claim_name,
+            utils.save_resource_claim_data(resource_claim_uuid, resource_claim_name,
                                            resource_claim_namespace, resource_claim)
 
             # Used by CloudForms
@@ -501,13 +413,13 @@ def prepare(anarchy_subject, logger):
             catalog_display_name = resource_claim_annotations.get(
                 f"{babylon_domain}/catalogDisplayName",
                 resource_claim_labels.get(f"{babylon_domain}/catalogItemName",
-                                          catalog_item_display_name(resource_label_governor))
+                                          parse_catalog_item(resource_label_governor))
             )
 
             catalog_item_display_name = resource_claim_annotations.get(
                 f"{babylon_domain}/catalogItemDisplayName",
                 resource_claim_labels.get(f"{babylon_domain}/catalogItemName",
-                                          catalog_item_display_name(resource_label_governor))
+                                          parse_catalog_item(resource_label_governor))
             )
 
             # Purpose and SalesForce Opportunity
@@ -518,11 +430,11 @@ def prepare(anarchy_subject, logger):
 
         except ApiException as e:
             if e.status == '404':
-                logger.warning(f"Resource Claim not found {as_resource_claim_name} "
+                logger.info(f"Resource Claim not found {resource_claim_name} "
                                f"from namespace {resource_claim_namespace} for provision "
                                f"UUID {resource_claim_uuid} - current_state: {resource_current_state}  - {e.status}")
                 pass
-            logger.warning(f"Unable to get namespace custom object resource claim {as_resource_claim_name} "
+            logger.warning(f"Unable to get namespace custom object resource claim {resource_claim_name} "
                            f"from namespace {resource_claim_namespace} for provision "
                            f"UUID {resource_claim_uuid} - current_state: {resource_current_state} - {e}")
             pass
@@ -531,11 +443,6 @@ def prepare(anarchy_subject, logger):
                 f"catalog_display_name: {catalog_display_name} "
                 f"catalog_item_display_name: {catalog_item_display_name}")
 
-    provision_job_start_timestamp = utils.timestamp_to_utc(provision_job.get('startTimestamp'))
-    provision_job_complete_timestamp = utils.timestamp_to_utc(provision_job.get('completeTimestamp'))
-
-    provision_time = 0
-    deploy_interval = None
     if provision_job_start_timestamp:
         # if provision has no completed, using current datetime as completed time
         if not provision_job_complete_timestamp:
@@ -547,7 +454,6 @@ def prepare(anarchy_subject, logger):
 
         logger.debug(f"Provision Time in Minutes: {provision_time} - Provision Time Interval: {deploy_interval}")
 
-    provision_job_vars = {}
     if provision_job_id:
         resp = requests.get(
             f"https://{ansible_tower_hostname}/api/v2/jobs/{provision_job_id}",
@@ -557,15 +463,16 @@ def prepare(anarchy_subject, logger):
         )
         provision_tower_job = resp.json()
         provision_job_vars = json.loads(provision_tower_job.get('extra_vars', '{}'))
-        utils.save_provision_vars(resource_claim_uuid, as_resource_claim_name, resource_claim_namespace,
+        utils.save_tower_extra_vars(resource_claim_uuid, resource_claim_name, resource_claim_namespace,
                                   provision_job_vars)
 
-    class_list = resource_label_governor.split('.')
-    class_name = f"{class_list[2]}_{class_list[1].replace('-', '_')}".upper()
 
+    logger.info(f"DEBUG GUID: provision_job_vars: {provision_job_vars.get('guid')} - resource_vars {resource_vars.get('babylon_guid')}")
+    babylon_guid = provision_job_vars.get('guid', resource_vars.get('babylon_guid'))
     workshop_users = provision_job_vars.get('user_count', provision_job_vars.get('num_users', 1))
 
     datasource = provision_job_vars.get('platform', 'BABYLON').upper()
+
     if datasource == 'LABS':
         datasource = 'OPENTLC'
 
@@ -583,11 +490,10 @@ def prepare(anarchy_subject, logger):
     if cloud == 'azure':
         sandbox_name = provision_data.get('sandbox_name')
     else:
-        sandbox_account = anarchy_subject_job_vars.get('sandbox_account', provision_data.get('ibm_sandbox_account'))
-        sandbox_name = anarchy_subject_job_vars.get('sandbox_name', provision_data.get('ibm_sandbox_name'))
+        sandbox_account = resource_vars.get('sandbox_account')
+        sandbox_name = resource_vars.get('sandbox_name')
 
     agnosticd_open_environment = provision_job_vars.get('agnosticd_open_environment', False)
-    chargeback_method = 'regional'
     if agnosticd_open_environment:
         chargeback_method = 'open'
 
@@ -598,8 +504,6 @@ def prepare(anarchy_subject, logger):
     if purpose is None:
         purpose = provision_job_vars.get('purpose', 'Development - Catalog item creation / maintenance')
 
-    platform_url = None
-    using_cloud_forms = False
     if notifier:
         platform_url = notifier
         using_cloud_forms = True
@@ -625,8 +529,8 @@ def prepare(anarchy_subject, logger):
         'current_state': resource_current_state,
         'desired_state': resource_desired_state,
         'guid': resource_guid,
-        'babylon_guid': provision_job_vars.get('guid', anarchy_subject_job_vars.get('guid')),
-        'cloud_region': provision_job_vars.get('region', anarchy_subject_job_vars.get('region')),
+        'babylon_guid': babylon_guid,
+        'cloud_region': provision_job_vars.get('region', resource_vars.get('cloud_region')),
         'cloud': cloud,
         'env_type': provision_job_vars.get('env_type', 'tests'),
         'datasource': datasource,
@@ -645,13 +549,14 @@ def prepare(anarchy_subject, logger):
         'tower_job_url': provision_job_url,
         'purpose': purpose,
         'anarchy_governor': resource_label_governor,
-        'anarchy_subject_name': anarchy_subject_metadata.get('name'),
+        'anarchy_subject_name': resource_vars.get('anarchy_subject_name'),
         'platform_url': platform_url,
         'azure_tenant': azure_tenant,
         'azure_subscription': azure_subscription,
         'using_cloud_forms': using_cloud_forms
     }
 
+    utils.save_provision_vars(resource_claim_uuid, resource_claim_name, resource_claim_namespace, provision)
     logger.info(f"Provision Details: {provision}")
 
     return provision
