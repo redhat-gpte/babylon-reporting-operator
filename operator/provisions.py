@@ -80,7 +80,6 @@ class Provisions(object):
         if current_state.startswith('provision-') and current_state != 'provision-pending':
             provision_results = current_state.replace('provision-', '')
 
-        # TODO: Fix provision results
         if provision_results == 'failed':
             provision_results = 'failure'
 

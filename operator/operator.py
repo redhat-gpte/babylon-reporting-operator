@@ -87,16 +87,13 @@ def handle_anarchy_events(logger, anarchy_subject, resource_vars):
 
     # Update provision_results if the last action was provision
     logger.info(f"handle_anarchy_events: {log_info}:")
-    if last_action == 'provisioning':
-        if 'failed' in last_action:
-            utils.provision_lifecycle(resource_claim_uuid, 'provision-failed', resource_claim_requester)
-            utils.update_provision_result(resource_claim_uuid, 'failure')
-        else:
-            utils.provision_lifecycle(resource_claim_uuid, 'provision-completed', resource_claim_requester)
-            # utils.update_provision_result(resource_claim_uuid, 'success')
-    elif last_action and last_action.startswith('provision'):
+    if last_action and last_action.startswith('provision') and 'failed' in resource_current_state:
         logger.info("Last action was provision, updating provision_result")
+        utils.provision_lifecycle(resource_claim_uuid, resource_current_state, resource_claim_requester)
         utils.update_provision_result(resource_claim_uuid, 'failure')
+
+    if last_action == 'provisioning' and 'completed' in resource_current_state:
+        utils.provision_lifecycle(resource_claim_uuid, 'provision-completed', resource_claim_requester)
     else:
         utils.provision_lifecycle(resource_claim_uuid, resource_current_state, resource_claim_requester)
 
@@ -156,6 +153,12 @@ def anarchysubject_event(event, logger, **_):
         logger.info(f"Provision: {resource_claim_uuid} - "
                        f"Current State: '{resource_current_state}'. "
                        f"We have to ignore it!")
+        return
+
+    if resource_current_state == resource_desired_state:
+        logger.info(f"No update required for {resource_claim_uuid} - "
+                    f"Current State: {resource_current_state} - "
+                    f"Desired State: {resource_desired_state}")
         return
 
     # TODO: Check if tower jobs is completed
@@ -383,7 +386,6 @@ def prepare(anarchy_subject, logger, resource_vars):
     logger.info(f"Resource UUID: {resource_claim_uuid} - "
                 f"Resource Current State: {resource_current_state} - "
                 f"Resource Desired State: {resource_desired_state}")
-
 
     # If we have resource_claim_namespace we have user associated
     if resource_claim_name and resource_claim_namespace and \
