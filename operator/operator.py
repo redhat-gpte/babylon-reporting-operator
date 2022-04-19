@@ -465,8 +465,10 @@ def prepare(anarchy_subject, logger, resource_vars):
         utils.save_tower_extra_vars(resource_claim_uuid, resource_claim_name, resource_claim_namespace,
                                   provision_job_vars)
 
+        # If resource_claim_requester is null try to get it from provision_job_vars
+        if not resource_claim_requester:
+            resource_claim_requester = provision_job_vars.get('requester_username')
 
-    logger.info(f"DEBUG GUID: provision_job_vars: {provision_job_vars.get('guid')} - resource_vars {resource_vars.get('babylon_guid')}")
     babylon_guid = provision_job_vars.get('guid', resource_vars.get('babylon_guid'))
     workshop_users = provision_job_vars.get('user_count', provision_job_vars.get('num_users', 1))
 
