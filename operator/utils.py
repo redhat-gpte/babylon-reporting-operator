@@ -446,6 +446,36 @@ def save_resource_claim_data(resource_claim_uuid, resource_claim_name, resource_
                                                         return_field='provision_uuid')
     cur = execute_query(query, positional_args=positional_args, autocommit=True)
 
+
+def save_anarchy_subject(resource_claim_uuid, resource_claim_name, resource_claim_namespace, anarchy_subject):
+    if len(anarchy_subject) == 0:
+        print('Resource Claim log size 0, do not insert into db')
+        return
+
+    if resource_claim_uuid is None:
+        return
+
+    insert_fields = {
+        'provision_uuid': resource_claim_uuid,
+        'resource_claim_name': resource_claim_name,
+        'resource_claim_namespace': resource_claim_namespace,
+        'anarchy_subject_json': json.dumps(anarchy_subject),
+        'created_at': datetime.now(timezone.utc)
+    }
+    update_fields = {
+        'resource_claim_name': resource_claim_name,
+        'resource_claim_namespace': resource_claim_namespace,
+        'anarchy_subject_json': json.dumps(anarchy_subject),
+    }
+
+    query, positional_args = create_sql_statement(insert_fields=insert_fields,
+                                                        update_fields=update_fields,
+                                                        table_name='resource_claim_log',
+                                                        constraint='resource_claim_log_pk',
+                                                        return_field='provision_uuid')
+    cur = execute_query(query, positional_args=positional_args, autocommit=True)
+
+
 def save_tower_extra_vars(resource_claim_uuid, resource_claim_name, resource_claim_namespace, provision_vars):
 
     if len(provision_vars) == 0:

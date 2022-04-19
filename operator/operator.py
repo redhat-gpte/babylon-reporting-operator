@@ -128,6 +128,7 @@ def namespace_event(event, logger, **_):
     name = namespace['metadata']['name']
     namespaces[name] = namespace
 
+
 @kopf.on.event(
     anarchy_domain, anarchy_api_version, 'anarchysubjects',
 )
@@ -148,6 +149,8 @@ def anarchysubject_event(event, logger, **_):
     resource_desired_state = resource_vars.get('desired_state')
     resource_claim_uuid = resource_vars.get('resource_claim_uuid')
     resource_claim_requester = resource_vars.get('resource_claim_requester')
+    resource_claim_name = resource_vars.get('resource_claim_name')
+    resource_claim_namespace = resource_vars.get('resource_claim_namespace')
 
     if not resource_current_state or resource_current_state in ('new', 'provision-pending'):
         logger.info(f"Provision: {resource_claim_uuid} - "
@@ -176,11 +179,8 @@ def anarchysubject_event(event, logger, **_):
         return
     else:
         handle_anarchy_events(logger, anarchy_subject, resource_vars)
-    # elif resource_current_state in resource_states:
-    #     resource_states[resource_current_state](logger, anarchy_subject, resource_vars)
-    # else:
-    #     logger.warning(f"Current state '{resource_current_state}' not found. Provision UUID: {resource_claim_uuid}")
-    #     return
+
+    utils.save_anarchy_subject(resource_claim_uuid, resource_claim_name, resource_claim_namespace, anarchy_subject)
 
 
 def populate_provision(logger, anarchy_subject, resource_vars):
@@ -241,6 +241,7 @@ def populate_user(provision, logger):
 
 
 def search_ipa_user(user_name, logger, notifier=False):
+    # generic_emea_eozkan
 
     if '@redhat' in user_name and not notifier:
         logger.info(f"Searching CORP LDAP username '{user_name}'")
@@ -303,11 +304,6 @@ def get_resource_vars(anarchy_subject):
         resource_claim_requester = 'poolboy'
 
     resource_claim_requester_email = anarchy_subject_annotations.get(f"{babylon_domain}/requester-email")
-
-    # elif resource_claim_namespace and not resource_claim_requester:
-    #     replace = '.'
-    #     temp_username = resource_claim_namespace.replace('user-', '')
-    #     resource_claim_requester = replace.join(temp_username.rsplit('-', 1))
 
     desired_state = anarchy_subject_spec_vars.get('desired_state')
 
