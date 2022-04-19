@@ -351,11 +351,13 @@ def update_lifetime(provision_uuid):
     if result['rowcount'] >= 1:
         query_result = result['query_result'][0]
         provisioning_at = query_result.get('logged_at')
-        lifetime = datetime.utcnow() - provisioning_at
-        print(f"Provision UUID {provision_uuid} lifetime: {lifetime}")
-        positional_args = [lifetime, provision_uuid]
-        query = "UPDATE provisions SET lifetime_interval = %s WHERE uuid = %s RETURNING uuid;"
-        execute_query(query, positional_args=positional_args, autocommit=True)
+
+        if provisioning_at:
+            lifetime = datetime.utcnow() - provisioning_at
+            print(f"Provision UUID {provision_uuid} lifetime: {lifetime}")
+            positional_args = [lifetime, provision_uuid]
+            query = "UPDATE provisions SET lifetime_interval = %s WHERE uuid = %s RETURNING uuid;"
+            execute_query(query, positional_args=positional_args, autocommit=True)
 
 
 def provision_lifecycle(provision_uuid, current_state, username):

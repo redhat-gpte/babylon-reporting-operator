@@ -152,6 +152,9 @@ def anarchysubject_event(event, logger, **_):
     resource_claim_namespace = resource_vars.get('resource_claim_namespace')
 
     if not resource_current_state or resource_current_state in invalid_states:
+        if resource_current_state == 'provisioning':
+            utils.provision_lifecycle(resource_claim_uuid, resource_current_state, resource_claim_requester)
+
         logger.info(f"Provision: {resource_claim_uuid} - "
                     f"Current State: '{resource_current_state}'. "
                     f"We have to ignore it!")
