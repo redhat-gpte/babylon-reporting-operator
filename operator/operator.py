@@ -141,8 +141,7 @@ def anarchysubject_event(event, logger, **_):
         logger.warning(event)
         return
 
-    # # TODO: Remove debug message after deploy in production
-    # logger.info(f"DEBUG anarchy_subject: {anarchy_subject}")
+    invalid_states = ['new', 'provision-pending', 'provisioning']
 
     resource_vars = get_resource_vars(anarchy_subject)
     resource_current_state = resource_vars.get('current_state')
@@ -152,10 +151,10 @@ def anarchysubject_event(event, logger, **_):
     resource_claim_name = resource_vars.get('resource_claim_name')
     resource_claim_namespace = resource_vars.get('resource_claim_namespace')
 
-    if not resource_current_state or resource_current_state in ('new', 'provision-pending'):
+    if not resource_current_state or resource_current_state in invalid_states:
         logger.info(f"Provision: {resource_claim_uuid} - "
-                       f"Current State: '{resource_current_state}'. "
-                       f"We have to ignore it!")
+                    f"Current State: '{resource_current_state}'. "
+                    f"We have to ignore it!")
         return
 
     if resource_current_state == resource_desired_state:
