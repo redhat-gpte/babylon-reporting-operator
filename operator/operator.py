@@ -287,10 +287,6 @@ def get_resource_vars(anarchy_subject):
     resource_claim_namespace = anarchy_subject_annotations.get(f"{poolboy_domain}/resource-claim-namespace")
     resource_claim_name = anarchy_subject_annotations.get(f"{poolboy_domain}/resource-claim-name")
 
-    # If we don't have resource_claim_name it means that the provision has been deployed using poolbooy
-    if not resource_claim_namespace:
-        resource_claim_requester = 'poolboy'
-
     # Get user name from poolboy annotation and fallback to namespace name
     resource_claim_requester = anarchy_subject_annotations.get(f"{babylon_domain}/requester",
                                                anarchy_subject_annotations.get(
@@ -298,6 +294,10 @@ def get_resource_vars(anarchy_subject):
                                                )
 
     if resource_claim_requester is None and 'empty-config' in resource_label_governor:
+        resource_claim_requester = 'poolboy'
+
+    # If we don't have resource_claim_name it means that the provision has been deployed using poolbooy
+    if not resource_claim_namespace:
         resource_claim_requester = 'poolboy'
 
     resource_claim_requester_email = anarchy_subject_annotations.get(f"{babylon_domain}/requester-email")
@@ -468,6 +468,7 @@ def prepare(anarchy_subject, logger, resource_vars):
         # If resource_claim_requester is null try to get it from provision_job_vars
         if not resource_claim_requester:
             resource_claim_requester = provision_job_vars.get('requester_username')
+
 
     babylon_guid = provision_job_vars.get('guid', resource_vars.get('babylon_guid'))
     workshop_users = provision_job_vars.get('user_count', provision_job_vars.get('num_users', 1))
