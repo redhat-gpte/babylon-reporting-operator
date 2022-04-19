@@ -241,8 +241,6 @@ def populate_user(provision, logger):
 
 
 def search_ipa_user(user_name, logger, notifier=False):
-    # generic_emea_eozkan
-
     if '@redhat' in user_name and not notifier:
         logger.info(f"Searching CORP LDAP username '{user_name}'")
         corp_ldap = GPTELdap(logger)
