@@ -160,12 +160,6 @@ def anarchysubject_event(event, logger, **_):
                     f"We have to ignore it!")
         return
 
-    if resource_current_state == resource_desired_state:
-        logger.info(f"No update required for {resource_claim_uuid} - "
-                    f"Current State: {resource_current_state} - "
-                    f"Desired State: {resource_desired_state}")
-        return
-
     # TODO: Check if tower jobs is completed
     if event['type'] == 'DELETED' and resource_current_state == 'destroying':
 
@@ -312,8 +306,12 @@ def get_resource_vars(anarchy_subject):
     provision_job = tower_jobs.get('provision', {})
     job_vars = anarchy_subject_spec_vars.get('job_vars', {})
 
-    sandbox_account = anarchy_subject_job_vars.get('sandbox_account', provision_data.get('ibm_sandbox_account'))
-    sandbox_name = anarchy_subject_job_vars.get('sandbox_name', provision_data.get('ibm_sandbox_name'))
+    sandbox_account = anarchy_subject_job_vars.get('sandbox_account',
+                                                   provision_data.get('ibm_sandbox_account',
+                                                                      provision_data.get('azure_subscription')))
+    sandbox_name = anarchy_subject_job_vars.get('sandbox_name',
+                                                provision_data.get('ibm_sandbox_name',
+                                                                   provision_data.get('sandbox_name')))
 
     babylon_guid = provision_job.get('guid', anarchy_subject_job_vars.get('guid')),
     cloud_region = provision_job.get('region', anarchy_subject_job_vars.get('region'))
@@ -489,7 +487,7 @@ def prepare(anarchy_subject, logger, resource_vars):
     elif cloud == 'none':
         cloud = 'shared'
 
-    azure_tenant = provision_data.get('azure_subscription')
+    azure_tenant = provision_data.get('azure_tenant')
     azure_subscription = provision_data.get('azure_subscription')
 
     if cloud == 'azure':
