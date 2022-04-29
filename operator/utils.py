@@ -81,7 +81,6 @@ def get_conn_params(secret_name='gpte-db-secrets'):
 # Wait 2^x * 500 milliseconds between each retry, up to 5 seconds, then 5 seconds afterwards and 3 attempts
 @retry(stop_max_attempt_number=3, wait_exponential_multiplier=500, wait_exponential_max=5000)
 def connect_to_db(fail_on_conn=True):
-
     db_connection = None
     conn_params = get_conn_params()
     try:
@@ -110,7 +109,6 @@ def connect_to_db(fail_on_conn=True):
 
 
 def execute_query(query, positional_args=None, autocommit=False):
-
     db_connection = connect_to_db()
 
     query_list = []
@@ -268,6 +266,7 @@ def parse_dict_null_value(dictionary):
 
     return new_dict
 
+
 @retry(stop_max_attempt_number=3, wait_exponential_multiplier=500, wait_exponential_max=5000)
 def get_secret_data(secret_name, secret_namespace=None):
     core_v1_api = kubernetes.client.CoreV1Api()
@@ -361,7 +360,6 @@ def update_lifetime(provision_uuid):
 
 
 def provision_lifecycle(provision_uuid, current_state, username):
-
     # TODO: Calculate lifetime using current_state = 'destroy-completed'
     if current_state == 'destroy-completed':
         update_lifetime(provision_uuid)
@@ -440,12 +438,12 @@ def save_resource_claim_data(resource_claim_uuid, resource_claim_name, resource_
         'resource_claim_json': json.dumps(resource_claim_json),
     }
 
-
     query, positional_args = create_sql_statement(insert_fields=insert_fields,
-                                                        update_fields=update_fields,
-                                                        table_name='resource_claim_log',
-                                                        constraint='resource_claim_log_pk',
-                                                        return_field='provision_uuid')
+                                                  update_fields=update_fields,
+                                                  table_name='resource_claim_log',
+                                                  constraint='resource_claim_log_pk',
+                                                  return_field='provision_uuid')
+
     cur = execute_query(query, positional_args=positional_args, autocommit=True)
 
 
@@ -471,15 +469,14 @@ def save_anarchy_subject(resource_claim_uuid, resource_claim_name, resource_clai
     }
 
     query, positional_args = create_sql_statement(insert_fields=insert_fields,
-                                                        update_fields=update_fields,
-                                                        table_name='resource_claim_log',
-                                                        constraint='resource_claim_log_pk',
-                                                        return_field='provision_uuid')
+                                                  update_fields=update_fields,
+                                                  table_name='resource_claim_log',
+                                                  constraint='resource_claim_log_pk',
+                                                  return_field='provision_uuid')
     cur = execute_query(query, positional_args=positional_args, autocommit=True)
 
 
 def save_tower_extra_vars(resource_claim_uuid, resource_claim_name, resource_claim_namespace, provision_vars):
-
     if len(provision_vars) == 0:
         print('Provision vars size 0, do not insert into db')
         return
@@ -498,15 +495,14 @@ def save_tower_extra_vars(resource_claim_uuid, resource_claim_name, resource_cla
     }
 
     query, positional_args = create_sql_statement(insert_fields=insert_fields,
-                                                        update_fields=update_fields,
-                                                        table_name='resource_claim_log',
-                                                        constraint='resource_claim_log_pk',
-                                                        return_field='provision_uuid')
+                                                  update_fields=update_fields,
+                                                  table_name='resource_claim_log',
+                                                  constraint='resource_claim_log_pk',
+                                                  return_field='provision_uuid')
     cur = execute_query(query, positional_args=positional_args, autocommit=True)
 
 
 def save_provision_vars(resource_claim_uuid, resource_claim_name, resource_claim_namespace, provision_vars):
-
     if len(provision_vars) == 0:
         print('Provision vars size 0, do not insert into db')
         return
@@ -525,10 +521,10 @@ def save_provision_vars(resource_claim_uuid, resource_claim_name, resource_claim
     }
 
     query, positional_args = create_sql_statement(insert_fields=insert_fields,
-                                                        update_fields=update_fields,
-                                                        table_name='resource_claim_log',
-                                                        constraint='resource_claim_log_pk',
-                                                        return_field='provision_uuid')
+                                                  update_fields=update_fields,
+                                                  table_name='resource_claim_log',
+                                                  constraint='resource_claim_log_pk',
+                                                  return_field='provision_uuid')
     cur = execute_query(query, positional_args=positional_args, autocommit=True)
 
 
@@ -548,7 +544,6 @@ def timestamp_to_utc(timestamp_received):
 
 
 def create_sql_statement(insert_fields, update_fields, table_name, constraint, return_field):
-
     positional_args = []
     list_fields = list(insert_fields.keys())
     list_str = ", ".join(list_fields)
@@ -577,4 +572,3 @@ def create_sql_statement(insert_fields, update_fields, table_name, constraint, r
         print(f"Query Insert: \n{query} - {positional_args}")
 
     return query, positional_args
-
