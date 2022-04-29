@@ -54,8 +54,7 @@ class Provisions(object):
             return {'id': None}
 
     def populate_provisions(self):
-
-        self.logger.info(f"Inserting Provision {self.provision_uuid}")
+        self.logger.info(f"Inserting Provision {self.provision_uuid} - {self.prov_data}")
         # if self.debug:
         #     print(json.dumps(self.prov_data, indent=2, default=str))
         catalog_id = self.prov_data.get('catalog_id', -1)
