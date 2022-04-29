@@ -78,7 +78,7 @@ def handle_anarchy_events(logger, anarchy_subject, resource_vars):
                 'current_state': resource_current_state,
                 'desired_state': resource_desired_state}
 
-    logger.info(f"Handle event provision {resource_current_state} {log_info}")
+    logger.info(f"Handle event provision: {resource_claim_uuid}: {resource_current_state} {log_info}")
 
     populate_provision(logger, anarchy_subject, resource_vars)
 
@@ -194,7 +194,7 @@ def populate_provision(logger, anarchy_subject, resource_vars):
 
     provision = prepare(anarchy_subject, logger, resource_vars)
 
-    logger.info(f"Populate Provision: {provision}")
+    logger.info(f"Populate Provision {resource_claim_uuid}: {provision}")
 
     user_name = provision.get('username')
     if user_name is None:
@@ -486,8 +486,9 @@ def prepare(anarchy_subject, logger, resource_vars):
     azure_tenant = provision_data.get('azure_tenant')
     azure_subscription = provision_data.get('azure_subscription')
 
-    if cloud == 'azure':
+    if 'azure-subscription' in resource_label_governor:
         sandbox_name = provision_data.get('sandbox_name')
+        sandbox_account = provision_data.get('azure_subscription')
     else:
         sandbox_account = resource_vars.get('sandbox_account')
         sandbox_name = resource_vars.get('sandbox_name')
