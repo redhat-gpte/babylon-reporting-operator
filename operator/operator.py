@@ -30,7 +30,6 @@ poolboy_domain = os.environ.get('POOLBOY_DOMAIN', 'poolboy.gpte.redhat.com')
 poolboy_api_version = os.environ.get('POOLBOY_API_VERSION', 'v1')
 pfe_domain = os.environ.get('PFE_DOMAIN', 'pfe.redhat.com')
 
-
 if os.path.exists('/run/secrets/kubernetes.io/serviceaccount'):
     kubernetes.config.load_incluster_config()
 else:
@@ -48,7 +47,7 @@ def handle_anarchy_events(logger, anarchy_subject, resource_vars):
         'provision-pending',
         'provisioning',
         'provision',
-        'provision-failed' ,
+        'provision-failed',
         'started',
         'start-pending',
         'starting',
@@ -121,7 +120,7 @@ def namespace_event(event, logger, **_):
 
     # Only respond to events that include Namespace data.
     if not namespace \
-    or namespace.get('kind') != 'Namespace':
+            or namespace.get('kind') != 'Namespace':
         logger.warning(event)
         return
 
@@ -137,11 +136,11 @@ def anarchysubject_event(event, logger, **_):
 
     # Only respond to events that include AnarchySubject data.
     if not anarchy_subject \
-    or anarchy_subject.get('kind') != 'AnarchySubject':
+            or anarchy_subject.get('kind') != 'AnarchySubject':
         logger.warning(event)
         return
 
-    invalid_states = ['new', 'provision-pending', 'provisioning']
+    invalid_states = ['new', 'provision-pending']
 
     resource_vars = get_resource_vars(anarchy_subject)
     resource_current_state = resource_vars.get('current_state')
@@ -229,7 +228,7 @@ def populate_user(provision, logger):
                    'manager_chargeback_id': None,
                    'manager_id': None,
                    'cost_center': None
-         }
+                   }
     else:
         results = users.populate_users()
 
@@ -286,9 +285,9 @@ def get_resource_vars(anarchy_subject):
 
     # Get user name from poolboy annotation and fallback to namespace name
     resource_claim_requester = anarchy_subject_annotations.get(f"{babylon_domain}/requester",
-                                               anarchy_subject_annotations.get(
-                                                   f"{poolboy_domain}/resource-requester-user")
-                                               )
+                                                               anarchy_subject_annotations.get(
+                                                                   f"{poolboy_domain}/resource-requester-user")
+                                                               )
 
     if resource_claim_requester is None and 'empty-config' in resource_label_governor:
         resource_claim_requester = 'poolboy'
@@ -341,7 +340,6 @@ def get_resource_vars(anarchy_subject):
 
 
 def prepare(anarchy_subject, logger, resource_vars):
-
     resource_current_state = resource_vars.get('current_state')
     resource_desired_state = resource_vars.get('desired_state')
     resource_claim_uuid = resource_vars.get('resource_claim_uuid')
@@ -374,7 +372,6 @@ def prepare(anarchy_subject, logger, resource_vars):
     provision_job_vars = {}
     platform_url = None
     using_cloud_forms = False
-
 
     logger.info(f"Resource claim UUID: {resource_claim_uuid} - resource_label_governor: {resource_label_governor}")
     logger.info(f"Resource UUID: {resource_claim_uuid} - "
@@ -431,8 +428,8 @@ def prepare(anarchy_subject, logger, resource_vars):
         except ApiException as e:
             if e.status == '404':
                 logger.info(f"Resource Claim not found {resource_claim_name} "
-                               f"from namespace {resource_claim_namespace} for provision "
-                               f"UUID {resource_claim_uuid} - current_state: {resource_current_state}  - {e.status}")
+                            f"from namespace {resource_claim_namespace} for provision "
+                            f"UUID {resource_claim_uuid} - current_state: {resource_current_state}  - {e.status}")
                 pass
             logger.warning(f"Unable to get namespace custom object resource claim {resource_claim_name} "
                            f"from namespace {resource_claim_namespace} for provision "
@@ -464,12 +461,11 @@ def prepare(anarchy_subject, logger, resource_vars):
         provision_tower_job = resp.json()
         provision_job_vars = json.loads(provision_tower_job.get('extra_vars', '{}'))
         utils.save_tower_extra_vars(resource_claim_uuid, resource_claim_name, resource_claim_namespace,
-                                  provision_job_vars)
+                                    provision_job_vars)
 
         # If resource_claim_requester is null try to get it from provision_job_vars
         if not resource_claim_requester:
             resource_claim_requester = provision_job_vars.get('requester_username')
-
 
     babylon_guid = provision_job_vars.get('guid', resource_vars.get('babylon_guid'))
     workshop_users = provision_job_vars.get('user_count', provision_job_vars.get('num_users', 1))
