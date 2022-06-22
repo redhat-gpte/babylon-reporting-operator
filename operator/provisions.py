@@ -77,7 +77,7 @@ class Provisions(object):
         current_state = self.prov_data.get('current_state')
         provision_result = 'success'
         if current_state.startswith('provision-') and current_state != 'provision-pending':
-            provision_result = self.prov_data.get('provision_result')
+            provision_result = self.prov_data.get('provision_result', 'success')
 
         if provision_result == 'failed':
             provision_result = 'failure'
