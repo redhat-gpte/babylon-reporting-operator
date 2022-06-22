@@ -161,10 +161,10 @@ def anarchysubject_event(event, logger, **_):
 
     # TODO: Check if tower jobs is completed
     if event['type'] == 'DELETED' and resource_current_state == 'destroying':
-
-        positional_args = [datetime.now(timezone.utc), resource_claim_uuid]
-        logger.info(f"Set retirement date for provision {resource_claim_uuid} - {datetime.now(timezone.utc)}")
-        query = f"UPDATE provisions SET retired_at = %s \n" \
+        retired_at = datetime.now(timezone.utc)
+        positional_args = [retired_at, retired_at, resource_claim_uuid]
+        logger.info(f"Set retirement date for provision {resource_claim_uuid} - {retired_at}")
+        query = f"UPDATE provisions SET retired_at = %s, lifetime_interval = %s - provisioned_at \n" \
                 f"WHERE uuid = %s and retired_at ISNULL RETURNING uuid;"
 
         utils.execute_query(query, positional_args=positional_args, autocommit=True)
@@ -183,7 +183,6 @@ def populate_provision(logger, anarchy_subject, resource_vars):
 
     resource_current_state = resource_vars.get('current_state')
     resource_claim_uuid = resource_vars.get('resource_claim_uuid')
-    logger.info(f"LOGGER populate_provision: {resource_claim_uuid} - {resource_vars}")
 
     if resource_current_state in invalid_states:
         return
@@ -451,6 +450,7 @@ def prepare(anarchy_subject, logger, resource_vars):
 
         logger.debug(f"Provision Time in Minutes: {provision_time} - Provision Time Interval: {deploy_interval}")
 
+    provision_job_status = 'success'
     if provision_job_id:
         resp = requests.get(
             f"https://{ansible_tower_hostname}/api/v2/jobs/{provision_job_id}",
@@ -460,6 +460,7 @@ def prepare(anarchy_subject, logger, resource_vars):
         )
         provision_tower_job = resp.json()
         provision_job_vars = json.loads(provision_tower_job.get('extra_vars', '{}'))
+        provision_job_status = provision_tower_job.get('status', 'success')
         utils.save_tower_extra_vars(resource_claim_uuid, resource_claim_name, resource_claim_namespace,
                                     provision_job_vars)
 
@@ -553,7 +554,8 @@ def prepare(anarchy_subject, logger, resource_vars):
         'platform_url': platform_url,
         'azure_tenant': azure_tenant,
         'azure_subscription': azure_subscription,
-        'using_cloud_forms': using_cloud_forms
+        'using_cloud_forms': using_cloud_forms,
+        'provision_result': provision_job_status
     }
 
     utils.save_provision_vars(resource_claim_uuid, resource_claim_name, resource_claim_namespace, provision)
