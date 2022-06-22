@@ -75,7 +75,7 @@ class Provisions(object):
         user_cost_center = user_db_info.get('cost_center')
 
         current_state = self.prov_data.get('current_state')
-        provision_result = 'success'
+        provision_result = 'installing'
         if current_state.startswith('provision-') and current_state != 'provision-pending':
             provision_result = self.prov_data.get('provision_result', 'success')
 
