@@ -89,7 +89,6 @@ def handle_anarchy_events(logger, anarchy_subject, resource_vars):
     if last_action and last_action.startswith('provision') and 'failed' in resource_current_state:
         logger.info("Last action was provision, updating provision_result")
         utils.provision_lifecycle(resource_claim_uuid, resource_current_state, resource_claim_requester)
-        utils.update_provision_result(resource_claim_uuid, 'failure')
 
     if last_action == 'provisioning' and 'completed' in resource_current_state:
         utils.provision_lifecycle(resource_claim_uuid, 'provision-completed', resource_claim_requester)
@@ -195,7 +194,7 @@ def populate_provision(logger, anarchy_subject, resource_vars):
 
     logger.info(f"Populate Provision {resource_claim_uuid}: {provision}")
 
-    user_name = provision.get('username')
+    user_name = provision.get('username', None)
     if user_name is None:
         logger.warning(f"Unable to get username for provision {provision.get('uuid')} - "
                        f"Current State: {provision.get('current_state')} - "
@@ -203,7 +202,8 @@ def populate_provision(logger, anarchy_subject, resource_vars):
                        f"anarchy_governor: {provision.get('anarchy_governor')}")
         provision['user'] = {}
     else:
-        provision['user'] = search_ipa_user(user_name, logger, provision.get('using_cloud_forms', False))
+        using_cloud_forms = provision.get('using_cloud_forms', False)
+        provision['user'] = search_ipa_user(user_name, logger, using_cloud_forms)
 
     provision['user_db'] = populate_user(provision, logger)
     provision['catalog_id'] = populate_catalog(provision, logger)
@@ -450,7 +450,7 @@ def prepare(anarchy_subject, logger, resource_vars):
 
         logger.debug(f"Provision Time in Minutes: {provision_time} - Provision Time Interval: {deploy_interval}")
 
-    provision_job_status = 'success'
+    provision_job_status = 'installing'
     if provision_job_id:
         resp = requests.get(
             f"https://{ansible_tower_hostname}/api/v2/jobs/{provision_job_id}",
@@ -460,7 +460,7 @@ def prepare(anarchy_subject, logger, resource_vars):
         )
         provision_tower_job = resp.json()
         provision_job_vars = json.loads(provision_tower_job.get('extra_vars', '{}'))
-        provision_job_status = provision_tower_job.get('status', 'success')
+        provision_job_status = provision_tower_job.get('status', 'installing')
         utils.save_tower_extra_vars(resource_claim_uuid, resource_claim_name, resource_claim_namespace,
                                     provision_job_vars)
 
