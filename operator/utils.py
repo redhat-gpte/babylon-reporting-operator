@@ -337,37 +337,9 @@ def last_lifecycle(provision_uuid):
     else:
         return None
 
-
-def update_lifetime(provision_uuid):
-    positional_args = [provision_uuid]
-    query = f"SELECT max(logged_at) as logged_at \n" \
-            f"FROM lifecycle_log ll \n" \
-            f"WHERE provision_uuid = %s AND state = 'provisioning' \n" \
-            f"LIMIT 1;"
-
-    result = execute_query(query, positional_args=positional_args, autocommit=True)
-
-    if result['rowcount'] >= 1:
-        query_result = result['query_result'][0]
-        provisioning_at = query_result.get('logged_at')
-
-        if provisioning_at:
-            lifetime = datetime.utcnow() - provisioning_at
-            print(f"Provision UUID {provision_uuid} lifetime: {lifetime}")
-            positional_args = [lifetime, provision_uuid]
-            query = "UPDATE provisions SET lifetime_interval = %s WHERE uuid = %s RETURNING uuid;"
-            execute_query(query, positional_args=positional_args, autocommit=True)
-
-
 def provision_lifecycle(provision_uuid, current_state, username):
-    # TODO: Calculate lifetime using current_state = 'destroy-completed'
-    if current_state == 'destroy-completed':
-        update_lifetime(provision_uuid)
 
     last_state = last_lifecycle(provision_uuid)
-
-    if last_state == current_state:
-        return
 
     print(f"Updating provision {provision_uuid} - last_state = {current_state}")
     current_date = datetime.now(timezone.utc)

@@ -75,17 +75,19 @@ class Provisions(object):
         user_cost_center = user_db_info.get('cost_center')
 
         current_state = self.prov_data.get('current_state')
-        provision_results = 'success'
+        provision_result = 'installing'
         if current_state.startswith('provision-') and current_state != 'provision-pending':
-            provision_results = current_state.replace('provision-', '')
+            provision_result = self.prov_data.get('provision_result', provision_result)
 
-        if provision_results == 'failed':
-            provision_results = 'failure'
+        if provision_result == 'failed':
+            provision_result = 'failure'
+        elif provision_result == 'successful':
+            provision_result = 'success'
 
         # TODO: Fix cloud ec2 to AWS and osp to openstack
         cloud = self.prov_data.get('cloud', 'unknown')
 
-        # Dictonary of fields to be inserted
+        # Dictionary of fields to be inserted
         insert_fields = {
             'student_id': student_id,
             'catalog_id': catalog_id,
@@ -95,7 +97,7 @@ class Provisions(object):
             'guid': self.prov_data.get('guid'),
             'uuid': self.provision_uuid,
             'babylon_guid': self.prov_data.get('babylon_guid'),
-            'provision_result': provision_results,
+            'provision_result': provision_result,
             'account': self.prov_data.get('account', 'tests'),
             'cloud_region': self.prov_data.get('cloud_region'),
             'purpose': purpose,
@@ -136,7 +138,7 @@ class Provisions(object):
             # 'guid': self.prov_data.get('guid'),
             'uuid': self.provision_uuid,
             'babylon_guid': self.prov_data.get('babylon_guid'),
-            # 'provision_result': provision_results,
+            'provision_result': provision_result,
             'account': self.prov_data.get('account', 'tests'),
             'cloud_region': self.prov_data.get('cloud_region'),
             'purpose': purpose,
