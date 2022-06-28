@@ -337,9 +337,12 @@ def last_lifecycle(provision_uuid):
     else:
         return None
 
-def provision_lifecycle(provision_uuid, current_state, username):
 
+def provision_lifecycle(provision_uuid, current_state, username):
     last_state = last_lifecycle(provision_uuid)
+
+    if last_state == current_state:
+        return
 
     print(f"Updating provision {provision_uuid} - last_state = {current_state}")
     current_date = datetime.now(timezone.utc)
