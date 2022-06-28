@@ -48,6 +48,7 @@ def handle_anarchy_events(logger, anarchy_subject, resource_vars):
         'provisioning',
         'provision',
         'provision-failed',
+        'provision-canceled',
         'started',
         'start-pending',
         'starting',
@@ -89,8 +90,7 @@ def handle_anarchy_events(logger, anarchy_subject, resource_vars):
     if last_action and last_action.startswith('provision') and 'failed' in resource_current_state:
         logger.info("Last action was provision, updating provision_result")
         utils.provision_lifecycle(resource_claim_uuid, resource_current_state, resource_claim_requester)
-
-    if last_action == 'provisioning' and 'completed' in resource_current_state:
+    if last_action == 'provisioning' and resource_desired_state == resource_current_state:
         utils.provision_lifecycle(resource_claim_uuid, 'provision-completed', resource_claim_requester)
     else:
         utils.provision_lifecycle(resource_claim_uuid, resource_current_state, resource_claim_requester)
@@ -210,6 +210,14 @@ def populate_provision(logger, anarchy_subject, resource_vars):
 
     prov = Provisions(logger, provision)
     prov.populate_provisions()
+
+    provision_result = provision.get('provision_result', 'running')
+    if provision_result == 'successful':
+        provision_result = 'success'
+    elif provision_result == 'failed':
+        provision_result = 'failure'
+
+    utils.update_provision_result(resource_claim_uuid, provision_result)
 
 
 def populate_catalog(provision, logger):
@@ -450,17 +458,17 @@ def prepare(anarchy_subject, logger, resource_vars):
 
         logger.debug(f"Provision Time in Minutes: {provision_time} - Provision Time Interval: {deploy_interval}")
 
-    provision_job_status = 'installing'
+    provision_job_status = 'running'
+
     if provision_job_id:
         resp = requests.get(
             f"https://{ansible_tower_hostname}/api/v2/jobs/{provision_job_id}",
             auth=(ansible_tower_user, ansible_tower_password),
-            # We really need to fix the tower certs!
             verify=False,
         )
         provision_tower_job = resp.json()
         provision_job_vars = json.loads(provision_tower_job.get('extra_vars', '{}'))
-        provision_job_status = provision_tower_job.get('status', 'installing')
+        provision_job_status = provision_tower_job.get('status', 'running')
         utils.save_tower_extra_vars(resource_claim_uuid, resource_claim_name, resource_claim_namespace,
                                     provision_job_vars)
 

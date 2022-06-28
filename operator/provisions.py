@@ -71,18 +71,13 @@ class Provisions(object):
         user_db_info = self.prov_data.get('user_db', {})
         student_id = user_db_info.get('user_id')
         user_manager_id = user_db_info.get('manager_id')
-        user_manager_chargeback_id  = user_db_info.get('manager_chargeback_id')
+        user_manager_chargeback_id = user_db_info.get('manager_chargeback_id')
         user_cost_center = user_db_info.get('cost_center')
 
         current_state = self.prov_data.get('current_state')
-        provision_result = 'installing'
+        provision_result = 'running'
         if current_state.startswith('provision-') and current_state != 'provision-pending':
             provision_result = self.prov_data.get('provision_result', provision_result)
-
-        if provision_result == 'failed':
-            provision_result = 'failure'
-        elif provision_result == 'successful':
-            provision_result = 'success'
 
         # TODO: Fix cloud ec2 to AWS and osp to openstack
         cloud = self.prov_data.get('cloud', 'unknown')
@@ -138,7 +133,6 @@ class Provisions(object):
             # 'guid': self.prov_data.get('guid'),
             'uuid': self.provision_uuid,
             'babylon_guid': self.prov_data.get('babylon_guid'),
-            'provision_result': provision_result,
             'account': self.prov_data.get('account', 'tests'),
             'cloud_region': self.prov_data.get('cloud_region'),
             'purpose': purpose,
