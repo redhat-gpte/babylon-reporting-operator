@@ -124,14 +124,17 @@ class GPTELdap(object):
                                 user_data = self.parse_ldap_result(result_data)
                                 if 'manager' in searchAttribute:
                                     manager_email = self.convert_dn_email(entry)
+                                    # TODO: I have to create a new way to get the top level
                                     if manager_email == 'bod@redhat.com' or \
-                                            manager_email == 'pcormier@redhat.com':
+                                            manager_email == 'pcormier@redhat.com' or \
+                                            manager_email == 'mhicks@redhat.com':
                                         return 'gpte@redhat.com'
                                     if manager_email in managers:
                                         return manager_email
                                     else:
                                         if manager_email == 'bod@redhat.com' or \
                                                 manager_email == 'pcormier@redhat.com' or \
+                                                manager_email == 'mhicks@redhat.com' or \
                                                 isinstance(manager_email, dict):
                                             return 'gpte@redhat.com'
                                         if manager_email in managers:
@@ -142,4 +145,3 @@ class GPTELdap(object):
             print(e)
 
         return user_data
-
