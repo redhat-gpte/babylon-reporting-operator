@@ -513,9 +513,11 @@ def prepare(anarchy_subject, logger, resource_vars):
     if purpose is None:
         purpose = provision_job_vars.get('purpose', 'Development - Catalog item creation / maintenance')
 
+    service_type = 'babylon'
     if notifier:
         platform_url = notifier
         using_cloud_forms = True
+        service_type = 'cfme'
 
     if '.' in catalog_display_name:
         catalog_display_name = parse_catalog_item(catalog_display_name)
@@ -563,7 +565,8 @@ def prepare(anarchy_subject, logger, resource_vars):
         'azure_tenant': azure_tenant,
         'azure_subscription': azure_subscription,
         'using_cloud_forms': using_cloud_forms,
-        'provision_result': provision_job_status
+        'provision_result': provision_job_status,
+        'service_type': service_type
     }
 
     utils.save_provision_vars(resource_claim_uuid, resource_claim_name, resource_claim_namespace, provision)

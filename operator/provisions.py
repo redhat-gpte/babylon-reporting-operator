@@ -102,7 +102,7 @@ class Provisions(object):
             'workload': self.prov_data.get('workload'),
             'provision_time': self.prov_data.get('provisiontime', 0),
             'deploy_interval': self.prov_data.get('deploy_interval'),
-            'service_type': self.prov_data.get('servicetype', 'babylon'),
+            'service_type': self.prov_data.get('service_type', 'babylon'),
             'stack_retries': self.prov_data.get('stack_retries', 1),
             'opportunity': self.prov_data.get('opportunity'),
             'purpose_id': purpose_id,
@@ -122,8 +122,6 @@ class Provisions(object):
             'last_state': current_state
         }
 
-        using_cloud_forms = self.prov_data.get('using_cloud_forms', False)
-
         update_fields = {
             'student_id': student_id,
             'catalog_id': catalog_id,
@@ -142,7 +140,7 @@ class Provisions(object):
             'workload': self.prov_data.get('workload'),
             'provision_time': self.prov_data.get('provision_time', 0),
             'deploy_interval': self.prov_data.get('deploy_interval'),
-            'service_type': self.prov_data.get('servicetype', 'babylon'),
+            'service_type': self.prov_data.get('service_type', 'babylon'),
             'stack_retries': self.prov_data.get('stack_retries', 1),
             'opportunity': self.prov_data.get('opportunity'),
             'purpose_id': purpose_id,
